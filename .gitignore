@@ -10,3 +10,4 @@ release/
 *.md
 !README.md
 native/*/build/
+apps/desktop/installer/output/
