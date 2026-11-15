@@ -1,0 +1,38 @@
+.panel {
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.visor {
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--visor-bg);
+  border: 1px solid var(--monitor-bezel-edge);
+  box-shadow: var(--shadow-inset);
+}
+
+.visor:focus-within {
+  border-color: var(--color-accent);
+}
+
+.input {
+  width: 100%;
+  min-height: 56px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  color: var(--visor-text);
+  caret-color: var(--visor-text);
+  text-transform: uppercase;
+}
+
+.input::placeholder {
+  color: rgba(95, 227, 212, 0.3);
+}
