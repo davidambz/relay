@@ -5,8 +5,12 @@ import { useI18n } from "../i18n/I18nContext";
 import { RelayMark } from "./icons";
 import styles from "./Header.module.css";
 
-export function Header({ live }: { live: boolean }) {
+export type HeaderStatus = "idle" | "live" | "watching";
+
+/** The status lamp is lit while broadcasting or watching, the app's two active states. */
+export function Header({ status }: { status: HeaderStatus }) {
   const { t } = useI18n();
+  const label = { idle: t.app.statusIdle, live: t.app.statusLive, watching: t.app.statusWatching }[status];
   return (
     <header className={styles.header}>
       <div className={styles.nameplate}>
@@ -14,8 +18,8 @@ export function Header({ live }: { live: boolean }) {
         <span className={styles.wordmark}>Relay</span>
       </div>
       <div className={styles.status} role="status">
-        <span className="lamp" data-lit={live} />
-        <span className="label">{live ? t.app.statusLive : t.app.statusIdle}</span>
+        <span className="lamp" data-lit={status !== "idle"} />
+        <span className="label">{label}</span>
       </div>
     </header>
   );

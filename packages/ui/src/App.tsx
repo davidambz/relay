@@ -79,7 +79,7 @@ export function App() {
 
   return (
     <div className={styles.app}>
-      <Header live={route.screen === "live"} />
+      <Header status={route.screen === "live" ? "live" : route.screen === "viewing" ? "watching" : "idle"} />
       <main className={styles.main}>
         {route.screen === "home" && (
           <Home onBroadcast={() => setRoute({ screen: "pick" })} onWatch={() => setRoute({ screen: "watch" })} />
