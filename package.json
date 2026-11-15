@@ -1,0 +1,32 @@
+{
+  "name": "relay",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @relay/desktop",
+    "dev:web": "npm run dev -w @relay/ui",
+    "build": "npm run build -w @relay/desktop",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "oxlint",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.5",
+    "@types/node": "^24.13.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "jsdom": "^28.1.0",
+    "oxlint": "^1.75.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
