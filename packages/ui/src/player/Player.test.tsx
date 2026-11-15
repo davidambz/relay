@@ -102,6 +102,19 @@ describe("Player", () => {
     expect(onFloatingWindow).toHaveBeenCalledTimes(2);
   });
 
+  it("uses the shell's native Picture-in-Picture where it has one", () => {
+    const enterPictureInPicture = vi.fn(async () => {});
+    render(
+      <PlatformContext.Provider
+        value={fakePlatform({ capabilities: { host: false, systemAudio: false, floating: "pip", selfUpdate: false }, enterPictureInPicture })}
+      >
+        <PlayerWithAudio onLeave={() => {}} />
+      </PlatformContext.Provider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Mini player (P)" }));
+    expect(enterPictureInPicture).toHaveBeenCalled();
+  });
+
   it("has no mini player button when the shell can't float", () => {
     renderPlayer();
     expect(screen.queryByRole("button", { name: "Mini player (P)" })).not.toBeInTheDocument();

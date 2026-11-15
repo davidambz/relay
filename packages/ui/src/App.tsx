@@ -39,6 +39,22 @@ export function App() {
     platform.setSessionActive?.(sessionActive);
   }, [platform, sessionActive]);
 
+  // Android back: step back through the screens; at home, leave the app.
+  // A live broadcast isn't ended by back (only by Stop).
+  useEffect(() => {
+    if (!platform.onBackButton) return;
+    return platform.onBackButton(() => {
+      let handled = true;
+      setRoute((current) => {
+        if (current.screen === "viewing") return { screen: "watch" };
+        if (current.screen === "watch" || current.screen === "pick") return { screen: "home" };
+        handled = false;
+        return current;
+      });
+      return handled;
+    });
+  }, [platform]);
+
   const handleSourceEnded = useCallback(() => {
     setRoute((current) => {
       if (current.screen === "live") stopStream(current.broadcast.stream);
