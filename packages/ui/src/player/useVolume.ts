@@ -11,8 +11,16 @@ function clampVolume(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : undefined;
 }
 
+export interface VolumeControls {
+  volume: number;
+  muted: boolean;
+  setVolume: (volume: number) => void;
+  setMuted: (muted: boolean) => void;
+  toggleMuted: () => void;
+}
+
 /** Volume and mute, remembered across sessions through Platform.storage. */
-export function useVolume() {
+export function useVolume(): VolumeControls {
   const { storage } = usePlatform();
   const [volume, setVolumeState] = useState(1);
   const [muted, setMutedState] = useState(false);
@@ -52,7 +60,8 @@ export function useVolume() {
     [storage],
   );
 
-  return { volume, muted, setVolume, setMuted, toggleMuted: () => setMuted(!muted) };
+  const toggleMuted = useCallback(() => setMuted(!muted), [muted, setMuted]);
+  return { volume, muted, setVolume, setMuted, toggleMuted };
 }
 
 /**

@@ -111,3 +111,29 @@ export function ExitFullscreenIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function MiniPlayerIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function ReturnIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M14 14 8 8M8 13V8h5" />
+    </svg>
+  );
+}
+
+export function CloseIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  );
+}

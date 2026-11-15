@@ -75,5 +75,7 @@ export const en: Strings = {
     volume: "Volume",
     fullscreen: "Fullscreen (F)",
     exitFullscreen: "Exit fullscreen (F)",
+    miniPlayer: "Mini player (P)",
+    returnToMain: "Back to the main window (P)",
   },
 };
