@@ -63,6 +63,11 @@ export async function checkForUpdate(): Promise<UpdateCheck> {
     check = { status: "failed", reason: error instanceof Error ? error.message : String(error) };
   }
   lastCheck = check;
+  // Fetch the installer in the background, so applying (or quitting)
+  // later doesn't have to wait for it.
+  if (check.status === "available" && app.isPackaged) {
+    void prepareInstaller(check).catch((error) => console.warn("Couldn't download the update", error));
+  }
   setStatus(
     check.status === "available"
       ? { state: "available", latestVersion: check.latestVersion }
@@ -73,28 +78,74 @@ export async function checkForUpdate(): Promise<UpdateCheck> {
   return check;
 }
 
+/**
+ * The verified installer for one version, downloaded at most once. Kept
+ * on disk so quitting can hand off to it instantly (see installOnQuit).
+ */
+let prepared: { version: string; file: Promise<string>; ready: string | null } | null = null;
+let installerLaunched = false;
+
+function prepareInstaller(check: Extract<UpdateCheck, { status: "available" }>): Promise<string> {
+  if (prepared?.version === check.latestVersion) return prepared.file;
+  // Unique name: never reuse a file another run may still be writing.
+  const installer = path.join(os.tmpdir(), `${INSTALLER_FILE_PREFIX}${process.pid}-${Date.now()}.exe`);
+  const entry: NonNullable<typeof prepared> = {
+    version: check.latestVersion,
+    ready: null,
+    file: download(check.downloadUrl, installer, check.sha256).then(
+      () => {
+        entry.ready = installer;
+        return installer;
+      },
+      (error: unknown) => {
+        fs.rm(installer, { force: true }, () => {});
+        // Let a later attempt try again from scratch.
+        if (prepared === entry) prepared = null;
+        throw error;
+      },
+    ),
+  };
+  prepared = entry;
+  return entry.file;
+}
+
+function launchInstaller(file: string, relaunch: boolean) {
+  installerLaunched = true;
+  const args = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"];
+  if (relaunch) args.push("/RELAUNCH");
+  spawn(file, args, { detached: true, stdio: "ignore" }).unref();
+}
+
 export async function applyUpdate(): Promise<void> {
   if (lastCheck?.status !== "available") throw new Error("No update to apply");
   if (sessionActive) throw new Error("Not while broadcasting or watching");
-  const { downloadUrl, latestVersion, sha256 } = lastCheck;
+  const check = lastCheck;
+  const { latestVersion } = check;
   setStatus({ state: "downloading", latestVersion });
-  // Unique name: a background check and a manual apply must never write
-  // the same file, or one could launch a half-written installer.
-  const installer = path.join(os.tmpdir(), `${INSTALLER_FILE_PREFIX}${process.pid}-${Date.now()}.exe`);
   try {
-    await download(downloadUrl, installer, sha256);
+    const installer = await prepareInstaller(check);
+    if (installerLaunched) return;
     setStatus({ state: "installing", latestVersion });
-    spawn(installer, ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/RELAUNCH"], {
-      detached: true,
-      stdio: "ignore",
-    }).unref();
+    launchInstaller(installer, true);
     // Get out of the installer's way; it relaunches us when done.
     setTimeout(() => app.quit(), 500);
   } catch (error) {
-    fs.rm(installer, { force: true }, () => {});
     setStatus({ state: "failed", reason: error instanceof Error ? error.message : String(error) });
     throw error;
   }
+}
+
+/**
+ * An update found while broadcasting or watching can't restart the app,
+ * so it waits. When the app quits with that update's installer already
+ * downloaded and verified, install it silently on the way out, without
+ * relaunching (the user asked to quit). Never waits on a download: if
+ * the installer isn't ready, the next start's check handles it.
+ */
+export function installOnQuit() {
+  if (!app.isPackaged || installerLaunched || !prepared?.ready) return;
+  if (lastCheck?.status !== "available" || lastCheck.latestVersion !== prepared.version) return;
+  launchInstaller(prepared.ready, false);
 }
 
 /**
@@ -137,7 +188,8 @@ function removeOldInstallers() {
 /**
  * Packaged builds only. At startup an available update is applied right
  * away if nothing is running (a quick restart right after opening is the
- * least disruptive moment); the daily check only announces it, so the
+ * least disruptive moment); the daily check only announces and downloads
+ * it, to be installed from the Updates panel or on quit, so the
  * app never restarts out of the blue later on.
  */
 export function scheduleUpdateChecks() {
