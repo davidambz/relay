@@ -72,8 +72,17 @@ jobs:
 
       - name: Read release notes from the tag
         run: |
+          # actions/checkout replaces the pushed annotated tag with a
+          # lightweight one pointing at the commit, so %(contents) would
+          # read the commit message instead (what v0.0.1 got, and the
+          # unexplained wrong body on Umbra's v0.1.1). Re-fetch the real
+          # tag object first.
+          git fetch --force origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+          if ((git cat-file -t "${{ github.ref_name }}") -ne "tag") {
+            Write-Host "::warning::${{ github.ref_name }} is not an annotated tag; release notes fall back to a default."
+          }
           $message = (git tag -l --format="%(contents)" "${{ github.ref_name }}") -join "`n"
-          if ([string]::IsNullOrWhiteSpace($message)) {
+          if ([string]::IsNullOrWhiteSpace($message) -or (git cat-file -t "${{ github.ref_name }}") -ne "tag") {
             # A lightweight tag has no message; re-tag with `git tag -a`.
             $message = "Relay ${{ steps.version.outputs.version }}."
           }
