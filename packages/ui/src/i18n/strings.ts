@@ -44,7 +44,12 @@ export interface Strings {
     viewersLabel: string;
     sourceLabel: string;
     stop: string;
-    connectionPending: string;
+    codePending: string;
+    startFailed: string;
+    retry: string;
+    reconnecting: string;
+    viewersOf: (count: number, max: number) => string;
+    noViewersYet: string;
     sourceEnded: string;
   };
   watch: {
@@ -53,6 +58,15 @@ export interface Strings {
     codeInvalid: string;
     back: string;
     watch: string;
-    connectionPending: string;
+    ended: string;
+    full: string;
+    notFound: string;
+    timeout: string;
+    network: string;
+  };
+  viewing: {
+    label: string;
+    connecting: (code: string) => string;
+    leave: string;
   };
 }
