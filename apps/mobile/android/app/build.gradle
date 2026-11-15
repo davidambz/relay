@@ -1,5 +1,23 @@
 apply plugin: 'com.android.application'
 
+// Version comes from the release tag (release.yml passes
+// -PrelayVersion=X.Y.Z); local and CI debug builds are 0.0.0.
+def relayVersionProperty = project.findProperty('relayVersion')
+def relayVersion = (relayVersionProperty ?: '0.0.0').toString()
+def versionParts = relayVersion.tokenize('.').collect { it as int }
+// Releases: X.Y.Z -> X*10000 + Y*100 + Z, so every release installs over
+// the last. Untagged builds: the CI run number (android.yml passes
+// RELAY_VERSION_CODE), so each debug APK installs over the previous
+// one; local builds stay at 1. Debug and release APKs are signed with
+// different keys, so the two numberings never meet on a device.
+def relayVersionCode = relayVersionProperty
+    ? Math.max(1, versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2])
+    : (System.getenv('RELAY_VERSION_CODE') ?: '1').toInteger()
+
+// Release signing key, from CI secrets (see release.yml). Without it the
+// release build stays unsigned and only debug builds are installable.
+def keystoreFile = System.getenv('RELAY_KEYSTORE_FILE')
+
 android {
     namespace = "com.davidambz.relay"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,10 +25,8 @@ android {
         applicationId "com.davidambz.relay"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // CI passes its run number, so every APK installs over the last
-        // one as an update; local builds stay at 1.
-        versionCode((System.getenv("RELAY_VERSION_CODE") ?: "1").toInteger())
-        versionName "1.0"
+        versionCode relayVersionCode
+        versionName relayVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,8 +34,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (keystoreFile) {
+            release {
+                storeFile file(keystoreFile)
+                storePassword System.getenv('RELAY_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('RELAY_KEY_ALIAS')
+                keyPassword System.getenv('RELAY_KEYSTORE_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystoreFile) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
