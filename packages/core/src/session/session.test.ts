@@ -101,6 +101,19 @@ describe("host and viewer together", () => {
     expect(sender.degradation).toEqual(["maintain-framerate"]);
   });
 
+  it("changes encoder settings for current viewers mid-broadcast", async () => {
+    const network = new FakeNetwork();
+    const host = new HostSession(stream, config(), network.factory, { makeCode: codes("ABC234") });
+    await host.start();
+    watch(network, "ABC234");
+    await flush();
+    host.setEncoderSettings({ bitrateScale: 0.5, degradationPreference: "maintain-resolution" });
+    await flush();
+    const sender = network.peers.get("relay-tenno-v1-ABC234")!.calls[0].sender;
+    expect(sender.applied.at(-1)).toBe(6_000_000);
+    expect(sender.degradation.at(-1)).toBe("maintain-resolution");
+  });
+
   it("steps the bitrate down as viewers join", async () => {
     const network = new FakeNetwork();
     const host = new HostSession(stream, config(), network.factory, { makeCode: codes("ABC234") });

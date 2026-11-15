@@ -19,9 +19,13 @@ export interface HostSessionEvents {
   onSignalingChange?: (connected: boolean) => void;
 }
 
-export interface HostSessionOptions extends HostSessionEvents {
-  /** From the chosen quality mode; see videoProfileFor. */
+export interface EncoderSettings {
   degradationPreference?: RTCDegradationPreference;
+  /** Multiplier on the per-viewer bitrate cap (see videoProfileFor). */
+  bitrateScale?: number;
+}
+
+export interface HostSessionOptions extends HostSessionEvents, EncoderSettings {
   /** Injectable for tests. */
   makeCode?: () => string;
 }
@@ -71,7 +75,7 @@ export class HostSession {
   private readonly createPeer: PeerFactory;
   private readonly events: HostSessionEvents;
   private readonly makeCode: () => string;
-  private readonly degradationPreference?: RTCDegradationPreference;
+  private encoder: EncoderSettings;
   private readonly sdpTransform: (sdp: string) => string;
 
   constructor(stream: MediaStream, config: SessionConfig, createPeer: PeerFactory, options: HostSessionOptions = {}) {
@@ -80,7 +84,7 @@ export class HostSession {
     this.createPeer = createPeer;
     this.events = options;
     this.makeCode = options.makeCode ?? generateCode;
-    this.degradationPreference = options.degradationPreference;
+    this.encoder = { degradationPreference: options.degradationPreference, bitrateScale: options.bitrateScale };
     this.sdpTransform = sessionSdpTransform(config.preferredVideoCodec);
   }
 
@@ -188,11 +192,21 @@ export class HostSession {
     this.viewersChanged();
   }
 
+  /** Changes encoder settings for every viewer mid-broadcast (no renegotiation). */
+  setEncoderSettings(settings: EncoderSettings) {
+    this.encoder = { ...this.encoder, ...settings };
+    this.applyEncoderSettings();
+  }
+
   private viewersChanged() {
     this.events.onViewersChange?.([...this.viewers.keys()]);
+    this.applyEncoderSettings();
+  }
+
+  private applyEncoderSettings() {
     const settings = {
-      maxBitrate: maxBitrateForViewers(this.viewers.size),
-      degradationPreference: this.degradationPreference,
+      maxBitrate: Math.round(maxBitrateForViewers(this.viewers.size) * (this.encoder.bitrateScale ?? 1)),
+      degradationPreference: this.encoder.degradationPreference,
     };
     for (const viewer of this.viewers.values()) {
       void applySenderSettings(() => viewer.call.peerConnection, settings, () => viewer.closed).catch((error) =>
