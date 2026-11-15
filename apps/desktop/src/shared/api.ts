@@ -35,6 +35,8 @@ export interface RelayDesktopApi {
   storeGet(key: string): Promise<unknown>;
   storeSet(key: string, value: unknown): Promise<void>;
   copyText(text: string): Promise<void>;
+  /** Mouse entering/leaving the mini player window (polled by main). */
+  onFloatingHover(listener: (hovered: boolean) => void): () => void;
 }
 
 export const IPC = {
@@ -54,4 +56,5 @@ export const IPC = {
   updateApply: "update:apply",
   updateStatus: "update:status",
   sessionActive: "session:active",
+  floatingHover: "floating:hover",
 } as const;

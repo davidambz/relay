@@ -40,6 +40,11 @@ const api: RelayDesktopApi = {
   storeGet: (key) => ipcRenderer.invoke(IPC.storeGet, key),
   storeSet: (key, value) => ipcRenderer.invoke(IPC.storeSet, key, value),
   copyText: (text) => ipcRenderer.invoke(IPC.copyText, text),
+  onFloatingHover(listener) {
+    const handler = (_event: IpcRendererEvent, hovered: boolean) => listener(hovered);
+    ipcRenderer.on(IPC.floatingHover, handler);
+    return () => ipcRenderer.removeListener(IPC.floatingHover, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld("relay", api);
