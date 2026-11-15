@@ -57,7 +57,7 @@ export const ptBR: Strings = {
     startFailed: "Não foi possível falar com o servidor de conexão. Confira sua internet e tente de novo.",
     retry: "Tentar de novo",
     reconnecting: "Reconectando ao servidor. Quem já está assistindo continua assistindo.",
-    viewersOf: (count, max) => `${count} de ${max}`,
+    viewersCount: (count, max) => (max === undefined ? String(count) : `${count} de ${max}`),
     noViewersYet: "Passe o código. Os espectadores aparecem aqui conforme entram.",
     sourceEnded: "A janela compartilhada foi fechada, então a transmissão acabou.",
   },

@@ -8,7 +8,7 @@ import { usePeerFactory } from "./PeerFactoryContext";
 
 export type HostState =
   | { status: "starting" }
-  | { status: "live"; code: string; viewers: string[]; maxViewers: number; signaling: boolean }
+  | { status: "live"; code: string; viewers: string[]; maxViewers?: number; signaling: boolean }
   | { status: "failed"; reason: string };
 
 /**

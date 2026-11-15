@@ -131,7 +131,18 @@ describe("host and viewer together", () => {
     expect(firstCall.sender.maxConcurrent).toBe(1);
   });
 
-  it("turns away viewers past the limit", async () => {
+  it("has no viewer limit by default", async () => {
+    const network = new FakeNetwork();
+    const viewerLists: string[][] = [];
+    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });
+    await host.start();
+    const watchers = Array.from({ length: 12 }, () => watch(network, "ABC234"));
+    await flush();
+    expect(viewerLists.at(-1)).toHaveLength(12);
+    expect(watchers.every(({ result }) => result.stream === stream && result.ended === undefined)).toBe(true);
+  });
+
+  it("turns away viewers past an optional limit", async () => {
     const network = new FakeNetwork();
     const viewerLists: string[][] = [];
     const host = new HostSession(stream, config({ maxViewers: 1 }), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });

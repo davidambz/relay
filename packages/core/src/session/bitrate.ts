@@ -8,10 +8,14 @@
  */
 export function maxBitrateForViewers(viewerCount: number): number {
   // Sized for good home upload links (the intended audience); 1080p60
-  // game footage is where the extra headroom shows.
+  // game footage is where the extra headroom shows. There's no viewer
+  // limit by default, so past a handful it keeps stepping down: the
+  // total upload grows far slower than the audience.
   if (viewerCount <= 2) return 12_000_000;
   if (viewerCount <= 4) return 10_000_000;
-  return 8_000_000;
+  if (viewerCount <= 6) return 8_000_000;
+  if (viewerCount <= 10) return 6_000_000;
+  return 4_000_000;
 }
 
 const POLL_INTERVAL_MS = 200;

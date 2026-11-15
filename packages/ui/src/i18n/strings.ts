@@ -55,7 +55,8 @@ export interface Strings {
     startFailed: string;
     retry: string;
     reconnecting: string;
-    viewersOf: (count: number, max: number) => string;
+    /** The viewer readout: just the count, or "N of M" when a cap is configured. */
+    viewersCount: (count: number, max?: number) => string;
     noViewersYet: string;
     sourceEnded: string;
   };

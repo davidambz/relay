@@ -33,13 +33,16 @@ describe("broadcasting and watching", () => {
       />,
     );
     const code = await within(host.container).findByText(/^[A-Z2-9]{6}$/);
-    expect(within(host.container).getByText("0 of 5")).toBeInTheDocument();
+    expect(within(host.container).getByText("0")).toBeInTheDocument();
+    expect(host.container.querySelectorAll(".lamp[data-lit]")).toHaveLength(0);
 
     const onEnded = vi.fn();
     const viewer = renderWith(network, <Viewing code={code.textContent!} onLeave={() => {}} onEnded={onEnded} />);
     expect(within(viewer.container).getByRole("status")).toHaveTextContent(`Connecting to ${code.textContent}`);
 
-    expect(await within(host.container).findByText("1 of 5")).toBeInTheDocument();
+    expect(await within(host.container).findByText("1")).toBeInTheDocument();
+    // One lamp per connected viewer, with no fixed row of seats.
+    expect(host.container.querySelectorAll(".lamp")).toHaveLength(1);
     await act(async () => {});
     expect(within(viewer.container).queryByRole("status")).not.toBeInTheDocument();
     expect(onEnded).not.toHaveBeenCalled();
@@ -50,6 +53,6 @@ describe("broadcasting and watching", () => {
     const onEnded = vi.fn();
     renderWith(network, <Viewing code="ABC234" onLeave={() => {}} onEnded={onEnded} />);
     await vi.waitFor(() => expect(onEnded).toHaveBeenCalledWith("not-found"));
-    expect(screen.queryByText("1 of 5")).not.toBeInTheDocument();
+    expect(screen.queryByText("1")).not.toBeInTheDocument();
   });
 });

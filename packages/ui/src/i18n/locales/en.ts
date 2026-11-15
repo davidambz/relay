@@ -57,7 +57,7 @@ export const en: Strings = {
     startFailed: "Couldn't reach the connection server. Check your internet and try again.",
     retry: "Try again",
     reconnecting: "Reconnecting to the server. Anyone already watching keeps watching.",
-    viewersOf: (count, max) => `${count} of ${max}`,
+    viewersCount: (count, max) => (max === undefined ? String(count) : `${count} of ${max}`),
     noViewersYet: "Share the code. Viewers show up here as they join.",
     sourceEnded: "The shared window was closed, so the broadcast ended.",
   },
