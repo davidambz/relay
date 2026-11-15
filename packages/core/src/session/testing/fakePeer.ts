@@ -37,7 +37,14 @@ export class FakeSender {
   getParameters() {
     return { encodings: [{} as RTCRtpEncodingParameters] } as RTCRtpSendParameters;
   }
+  /** Most setParameters calls ever running at once (real senders reject overlaps). */
+  maxConcurrent = 0;
+  private inFlight = 0;
   async setParameters(parameters: RTCRtpSendParameters) {
+    this.inFlight++;
+    this.maxConcurrent = Math.max(this.maxConcurrent, this.inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    this.inFlight--;
     this.applied.push(parameters.encodings[0].maxBitrate!);
     this.degradation.push(parameters.degradationPreference);
   }
@@ -155,8 +162,12 @@ export class FakePeer extends FakeEmitter implements PeerLike {
     });
     return local;
   }
+  /** Like PeerJS: a successful reconnect emits "open" again. */
   reconnect() {
     this.disconnected = false;
+    tick(() => {
+      if (!this.destroyed) this.emit("open", this.id);
+    });
   }
   destroy() {
     if (this.destroyed) return;

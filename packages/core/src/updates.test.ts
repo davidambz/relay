@@ -1,7 +1,11 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { evaluateRelease, isNewerVersion, parseVersion } from "./updates";
+import { evaluateRelease as evaluate, isNewerVersion, parseSha256Digest, parseVersion } from "./updates";
+
+const REPO = "davidambz/relay";
+const URL = `https://github.com/${REPO}/releases/download/v0.2.0/RelaySetup-0.2.0.exe`;
+const evaluateRelease = (current: string, release: unknown) => evaluate(current, release, REPO);
 
 describe("parseVersion", () => {
   it("accepts X.Y.Z with an optional v", () => {
@@ -25,7 +29,7 @@ describe("isNewerVersion", () => {
 });
 
 describe("evaluateRelease", () => {
-  const release = (tag: string, assets: object[] = [{ name: `RelaySetup-${tag.replace("v", "")}.exe`, browser_download_url: "https://example.com/setup.exe" }]) => ({
+  const release = (tag: string, assets: object[] = [{ name: `RelaySetup-${tag.replace("v", "")}.exe`, browser_download_url: URL }]) => ({
     tag_name: tag,
     assets,
   });
@@ -34,8 +38,21 @@ describe("evaluateRelease", () => {
     expect(evaluateRelease("0.1.0", release("v0.2.0"))).toEqual({
       status: "available",
       latestVersion: "0.2.0",
-      downloadUrl: "https://example.com/setup.exe",
+      downloadUrl: URL,
     });
+  });
+
+  it("carries the installer's SHA-256 when GitHub reports a digest", () => {
+    const hex = "AB".repeat(32);
+    const withDigest = release("v0.2.0", [{ name: "RelaySetup-0.2.0.exe", browser_download_url: URL, digest: `sha256:${hex}` }]);
+    expect(evaluateRelease("0.1.0", withDigest)).toMatchObject({ status: "available", sha256: hex.toLowerCase() });
+  });
+
+  it("refuses an installer hosted anywhere but the repo's releases", () => {
+    for (const url of ["https://example.com/RelaySetup.exe", "https://github.com/someone/else/releases/download/v0.2.0/RelaySetup-0.2.0.exe", "http://github.com/davidambz/relay/releases/download/x.exe", "https://github.com/davidambz/relay/releases/download/../../../evil/x/releases/download/RelaySetup.exe", "not a url"]) {
+      const bad = release("v0.2.0", [{ name: "RelaySetup-0.2.0.exe", browser_download_url: url }]);
+      expect(evaluateRelease("0.1.0", bad)).toMatchObject({ status: "failed" });
+    }
   });
 
   it("is up to date on the same or an older release", () => {
@@ -44,11 +61,20 @@ describe("evaluateRelease", () => {
   });
 
   it("doesn't offer a release whose installer isn't attached yet", () => {
-    expect(evaluateRelease("0.1.0", release("v0.2.0", [{ name: "notes.txt", browser_download_url: "x" }]))).toMatchObject({ status: "up-to-date" });
+    expect(evaluateRelease("0.1.0", release("v0.2.0", [{ name: "notes.txt", browser_download_url: "x" }]))).toEqual({ status: "up-to-date" });
   });
 
   it("treats odd tags as nothing to offer and a bad current version as a failure", () => {
     expect(evaluateRelease("0.1.0", { tag_name: "nightly" })).toEqual({ status: "up-to-date" });
     expect(evaluateRelease("dev", release("v0.2.0"))).toMatchObject({ status: "failed" });
+  });
+});
+
+describe("parseSha256Digest", () => {
+  it("reads GitHub's sha256:<hex> digests and ignores anything else", () => {
+    expect(parseSha256Digest(`sha256:${"0f".repeat(32)}`)).toBe("0f".repeat(32));
+    for (const bad of [undefined, null, "", "sha256:abc", `sha512:${"0f".repeat(32)}`, `${"0f".repeat(32)}`]) {
+      expect(parseSha256Digest(bad)).toBeUndefined();
+    }
   });
 });

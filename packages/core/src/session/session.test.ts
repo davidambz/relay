@@ -8,7 +8,11 @@ import { FakeNetwork, type FakeMediaConnection } from "./testing/fakePeer";
 import { VIEWER_STREAM_TIMEOUT_MS, ViewerSession, type ViewerEndReason } from "./viewer";
 
 const stream = { id: "host-stream" } as unknown as MediaStream;
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+// A few macrotask turns: enough for connections to open and the fake
+// senders' async setParameters to settle.
+const flush = async () => {
+  for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+};
 const config = (overrides: Partial<SessionConfig> = {}): SessionConfig => ({ ...DEFAULT_SESSION_CONFIG, ...overrides });
 
 function codes(...values: string[]) {
@@ -120,8 +124,11 @@ describe("host and viewer together", () => {
     await host.start();
     for (let i = 0; i < 3; i++) watch(network, "ABC234");
     await flush();
+    await flush();
     const firstCall = network.peers.get("relay-tenno-v1-ABC234")!.calls[0];
-    expect(firstCall.sender.applied).toEqual([12_000_000, 12_000_000, 10_000_000]);
+    // The newest cap wins, and updates to one sender never overlap.
+    expect(firstCall.sender.applied.at(-1)).toBe(10_000_000);
+    expect(firstCall.sender.maxConcurrent).toBe(1);
   });
 
   it("turns away viewers past the limit", async () => {
@@ -136,6 +143,41 @@ describe("host and viewer together", () => {
     expect(second.result.ended).toBe("full");
     expect(second.result.stream).toBeUndefined();
     expect(first.result.ended).toBeUndefined();
+    expect(viewerLists.at(-1)).toHaveLength(1);
+  });
+
+  it("doesn't connect twice when the viewer's signaling reconnects", async () => {
+    const network = new FakeNetwork();
+    const viewerLists: string[][] = [];
+    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });
+    await host.start();
+    const { result } = watch(network, "ABC234");
+    await flush();
+    const viewerPeer = network.created.find((peer) => peer.id.startsWith("auto-"))!;
+    viewerPeer.emit("disconnected");
+    await flush();
+    expect(network.peers.get("relay-tenno-v1-ABC234")!.calls).toHaveLength(1);
+    expect(viewerLists.at(-1)).toHaveLength(1);
+    expect(result.ended).toBeUndefined();
+  });
+
+  it("replaces a viewer that connects again without counting it twice", async () => {
+    const network = new FakeNetwork();
+    const viewerLists: string[][] = [];
+    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });
+    await host.start();
+    watch(network, "ABC234");
+    await flush();
+    const viewerPeer = network.created.find((peer) => peer.id.startsWith("auto-"))!;
+    const firstConn = viewerPeer.connections[0];
+    viewerPeer.connect("relay-tenno-v1-ABC234");
+    await flush();
+    const hostCalls = network.peers.get("relay-tenno-v1-ABC234")!.calls;
+    expect(hostCalls).toHaveLength(2);
+    expect(viewerLists.at(-1)).toHaveLength(1);
+    // Late events from the replaced connection don't drop its successor.
+    firstConn.close();
+    await flush();
     expect(viewerLists.at(-1)).toHaveLength(1);
   });
 
