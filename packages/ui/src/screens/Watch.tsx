@@ -9,7 +9,14 @@ import { useI18n } from "../i18n/I18nContext";
 import screen from "./Screen.module.css";
 import styles from "./Watch.module.css";
 
-export function Watch({ onBack }: { onBack: () => void }) {
+interface WatchProps {
+  /** Shown above the form, e.g. why the last broadcast ended. */
+  notice?: string;
+  onBack: () => void;
+  onWatch: (code: string) => void;
+}
+
+export function Watch({ notice, onBack, onWatch }: WatchProps) {
   const { t } = useI18n();
   const [code, setCode] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -18,10 +25,16 @@ export function Watch({ onBack }: { onBack: () => void }) {
   function submit(event: FormEvent) {
     event.preventDefault();
     setSubmitted(true);
+    if (valid) onWatch(code);
   }
 
   return (
     <form className={screen.screen} onSubmit={submit}>
+      {notice && (
+        <p className={[screen.note, styles.panel].join(" ")} role="status">
+          {notice}
+        </p>
+      )}
       <section className={[screen.panel, styles.panel].join(" ")}>
         <label htmlFor="watch-code" className="label">
           {t.watch.codeLabel}
@@ -53,11 +66,6 @@ export function Watch({ onBack }: { onBack: () => void }) {
         {submitted && !valid && (
           <p className={screen.error} role="alert">
             {t.watch.codeInvalid}
-          </p>
-        )}
-        {submitted && valid && (
-          <p className={screen.note} role="status">
-            {t.watch.connectionPending}
           </p>
         )}
       </section>
