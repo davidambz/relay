@@ -41,13 +41,19 @@ export function listOpenWindows(): Promise<OpenWindow[] | null> {
       }
       try {
         const parsed: unknown = JSON.parse(stdout);
-        resolve(Array.isArray(parsed) ? (parsed as OpenWindow[]) : null);
+        resolve(Array.isArray(parsed) ? parsed.filter(isOpenWindow) : null);
       } catch {
         console.warn("winlist printed something that isn't JSON");
         resolve(null);
       }
     });
   });
+}
+
+function isOpenWindow(value: unknown): value is OpenWindow {
+  if (typeof value !== "object" || value === null) return false;
+  const { hwnd, pid, exe, title } = value as Record<string, unknown>;
+  return Number.isInteger(hwnd) && Number.isInteger(pid) && typeof exe === "string" && typeof title === "string";
 }
 
 /** Chromium window source ids look like "window:<hwnd>:0". */

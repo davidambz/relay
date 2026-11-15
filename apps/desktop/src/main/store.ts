@@ -18,11 +18,18 @@ function filePath() {
 function load(): Record<string, unknown> {
   if (cache) return cache;
   try {
-    cache = JSON.parse(fs.readFileSync(filePath(), "utf8")) as Record<string, unknown>;
+    const parsed: unknown = JSON.parse(fs.readFileSync(filePath(), "utf8"));
+    // Valid JSON that isn't an object (null, an array, a number) would
+    // make every lookup throw; treat it like a missing file.
+    cache = isPlainObject(parsed) ? parsed : {};
   } catch {
     cache = {};
   }
   return cache;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function storeGet(key: string): unknown {
