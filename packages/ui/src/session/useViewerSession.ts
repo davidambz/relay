@@ -34,8 +34,14 @@ export function useViewerSession(code: string): ViewerState {
       session.connect();
     });
 
+    // Closing the window doesn't unmount React; leave explicitly so the
+    // broadcaster's viewer count drops right away.
+    const leaveOnUnload = () => session?.leave();
+    window.addEventListener("pagehide", leaveOnUnload);
+
     return () => {
       disposed = true;
+      window.removeEventListener("pagehide", leaveOnUnload);
       session?.leave();
     };
   }, [code, platform, createPeer]);
