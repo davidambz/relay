@@ -69,6 +69,13 @@
   pointer-events: none;
 }
 
+/* In the system's PiP window (the whole app, shrunk): the picture only. */
+.player[data-pip] .top,
+.player[data-pip] .bar,
+.player[data-pip] .placeholder {
+  display: none;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

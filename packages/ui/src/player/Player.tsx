@@ -21,9 +21,14 @@ interface PlayerProps {
   onLeave: () => void;
   /** Open the shell's mini-player window (capabilities.floating === "window"). */
   onFloatingWindow?: () => void;
+  /**
+   * The whole app is in the system's Picture-in-Picture window (Android):
+   * show only the picture, no badge or controls.
+   */
+  pictureInPicture?: boolean;
 }
 
-export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWindow }: PlayerProps) {
+export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWindow, pictureInPicture = false }: PlayerProps) {
   const { t } = useI18n();
   const platform = usePlatform();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,6 +49,15 @@ export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWi
     video.volume = volume;
     video.muted = muted;
   }, [volume, muted]);
+
+  // Phones: fullscreen also means no system bars and landscape. Leaving
+  // fullscreen (or the player) puts both back.
+  const { setImmersive } = platform;
+  useEffect(() => {
+    if (!setImmersive || !fullscreen.isFullscreen) return;
+    void setImmersive(true).catch((error) => console.warn("Couldn't go immersive", error));
+    return () => void setImmersive(false).catch(() => {});
+  }, [setImmersive, fullscreen.isFullscreen]);
 
   const floatingMode = platform.capabilities.floating;
   const canFloat =
@@ -100,6 +114,7 @@ export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWi
       ref={containerRef}
       className={styles.player}
       data-chrome={chrome.visible ? "shown" : "hidden"}
+      data-pip={pictureInPicture || undefined}
       onPointerMove={onStagePointer}
       onPointerDown={onStagePointer}
       onPointerUp={onStagePointerUp}

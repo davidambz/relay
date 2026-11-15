@@ -99,6 +99,17 @@ export interface Platform {
    */
   onBackButton?(handler: () => boolean): () => void;
   /**
+   * Phones: while the player is fullscreen, hide the system bars and turn
+   * the screen to landscape; false restores both.
+   */
+  setImmersive?(on: boolean): Promise<void>;
+  /**
+   * Shells whose Picture-in-Picture shrinks the whole app (Android): tells
+   * the UI when PiP starts and ends, so it can show only the video.
+   * Returns an unsubscribe function.
+   */
+  onPictureInPictureChange?(listener: (active: boolean) => void): () => void;
+  /**
    * Desktop mini player: whether the mouse is over its window, tracked by
    * the shell. Windows doesn't send the page mouse events over the
    * window's drag area, so the page alone can't tell. Returns an

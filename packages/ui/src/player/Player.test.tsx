@@ -125,4 +125,45 @@ describe("Player", () => {
     fireEvent.click(screen.getByRole("button", { name: /Leave/ }));
     expect(onLeave).toHaveBeenCalled();
   });
+
+  it("shows only the picture while the app is in the system's PiP window", () => {
+    const platform = fakePlatform();
+    const { container, rerender } = render(
+      <PlatformContext.Provider value={platform}>
+        <Player stream={null} code="ABC234" placeholder="Connecting…" audio={{ volume: 1, muted: false, setVolume: () => {}, setMuted: () => {}, toggleMuted: () => {} }} onLeave={() => {}} />
+      </PlatformContext.Provider>,
+    );
+    const player = container.querySelector("[data-chrome]") as HTMLElement;
+    expect(player.hasAttribute("data-pip")).toBe(false);
+    rerender(
+      <PlatformContext.Provider value={platform}>
+        <Player stream={null} code="ABC234" placeholder="Connecting…" audio={{ volume: 1, muted: false, setVolume: () => {}, setMuted: () => {}, toggleMuted: () => {} }} onLeave={() => {}} pictureInPicture />
+      </PlatformContext.Provider>,
+    );
+    expect(player.hasAttribute("data-pip")).toBe(true);
+  });
+
+  it("asks the shell for immersive landscape while fullscreen, and restores it after", async () => {
+    const setImmersive = vi.fn(async () => {});
+    const platform = fakePlatform({ setImmersive });
+    const { container, unmount } = render(
+      <PlatformContext.Provider value={platform}>
+        <Player stream={null} code="ABC234" audio={{ volume: 1, muted: false, setVolume: () => {}, setMuted: () => {}, toggleMuted: () => {} }} onLeave={() => {}} />
+      </PlatformContext.Provider>,
+    );
+    const player = container.querySelector("[data-chrome]") as HTMLElement;
+    // jsdom has no Fullscreen API; stand in for what the browser reports.
+    let current: Element | null = player;
+    Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => current });
+    try {
+      act(() => void document.dispatchEvent(new Event("fullscreenchange")));
+      expect(setImmersive).toHaveBeenLastCalledWith(true);
+      current = null;
+      act(() => void document.dispatchEvent(new Event("fullscreenchange")));
+      expect(setImmersive).toHaveBeenLastCalledWith(false);
+    } finally {
+      delete (document as { fullscreenElement?: unknown }).fullscreenElement;
+      unmount();
+    }
+  });
 });

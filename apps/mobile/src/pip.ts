@@ -19,3 +19,11 @@ export interface RelayPipPlugin {
 }
 
 export const RelayPip = registerPlugin<RelayPipPlugin>("RelayPip");
+
+// Native side: android/app/src/main/java/com/davidambz/relay/ScreenPlugin.java.
+export interface RelayScreenPlugin {
+  /** Hides the system bars and turns to landscape (true), or restores both. */
+  setImmersive(options: { on: boolean }): Promise<void>;
+}
+
+export const RelayScreen = registerPlugin<RelayScreenPlugin>("RelayScreen");
