@@ -1,0 +1,46 @@
+name: Android
+
+# Builds the Android viewer (apps/mobile) into a debug APK and keeps it as
+# a workflow artifact, so every change can be installed on a phone without
+# an Android toolchain on anyone's PC. GitHub's Ubuntu runners already
+# ship the Android SDK; only the JDK needs setting up.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/README.md"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the web app and sync it into the Android project
+        run: npm run sync --workspace @relay/mobile
+
+      - name: Build the debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relay-android-debug
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
