@@ -1,0 +1,15 @@
+# Only used to produce the unpacked app folder (release/win-unpacked).
+# The installer itself is Inno Setup (installer/relay.iss, stage 6), same
+# as Umbra, so there's deliberately no nsis target here.
+appId: com.davidambz.relay
+productName: Relay
+copyright: Copyright (C) 2026 David Ambrozio
+directories:
+  output: release
+files:
+  - dist-electron/**
+  - dist-renderer/**
+  - package.json
+asar: true
+win:
+  target: dir

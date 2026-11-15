@@ -1,0 +1,24 @@
+{
+  "name": "@relay/desktop",
+  "productName": "Relay",
+  "description": "Peer-to-peer screen sharing",
+  "author": "David Ambrozio",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "package": "node scripts/build.mjs && electron-builder --dir",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@relay/core": "*",
+    "@relay/ui": "*",
+    "electron": "^45.3.2",
+    "electron-builder": "^26.0.0",
+    "esbuild": "^0.28.2"
+  }
+}
