@@ -98,4 +98,11 @@ export interface Platform {
    * navigated within the app; otherwise the shell backgrounds the app.
    */
   onBackButton?(handler: () => boolean): () => void;
+  /**
+   * Desktop mini player: whether the mouse is over its window, tracked by
+   * the shell. Windows doesn't send the page mouse events over the
+   * window's drag area, so the page alone can't tell. Returns an
+   * unsubscribe function.
+   */
+  onFloatingHover?(listener: (hovered: boolean) => void): () => void;
 }

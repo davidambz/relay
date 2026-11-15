@@ -51,7 +51,6 @@ export function Viewing({ code, onLeave, onEnded }: ViewingProps) {
           stream={stream}
           audio={audio}
           onReturn={closeFloating}
-          onLeave={onLeave}
         />
       )}
     </div>

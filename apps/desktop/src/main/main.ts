@@ -194,7 +194,9 @@ function createWindow() {
     child.setMenu(null);
     // The mini player replaces the main window until it closes.
     window.hide();
+    const stopHoverTracking = trackFloatingHover(child, window);
     child.on("closed", () => {
+      stopHoverTracking();
       if (!window.isDestroyed()) window.show();
     });
   });
@@ -220,6 +222,30 @@ function createWindow() {
 }
 
 const FLOATING_WINDOW_NAME = "relay-floating";
+const HOVER_POLL_MS = 100;
+
+/**
+ * Tells the page whether the mouse is over the mini player, so its
+ * controls show exactly while hovered. Polled from here because Windows
+ * delivers no mouse events to the page over the drag grip (it's the
+ * frameless window's title bar), so the page would see the mouse "leave"
+ * as soon as it reached the grip. The mini player's React tree lives in
+ * the main window's renderer (window.open portal), so that's who hears it.
+ */
+function trackFloatingHover(child: BrowserWindow, owner: BrowserWindow): () => void {
+  let hovered: boolean | null = null;
+  const timer = setInterval(() => {
+    if (child.isDestroyed() || owner.isDestroyed()) return;
+    const { x, y } = screen.getCursorScreenPoint();
+    const bounds = child.getBounds();
+    const inside = x >= bounds.x && x < bounds.x + bounds.width && y >= bounds.y && y < bounds.y + bounds.height;
+    if (inside !== hovered) {
+      hovered = inside;
+      owner.webContents.send(IPC.floatingHover, inside);
+    }
+  }, HOVER_POLL_MS);
+  return () => clearInterval(timer);
+}
 const FLOATING_SIZE = { width: 480, height: 270 };
 const FLOATING_MARGIN = 24;
 
