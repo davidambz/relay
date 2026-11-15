@@ -87,4 +87,15 @@ export interface Platform {
   updates?: UpdatesApi;
   /** Tells the shell a broadcast or viewer session is running (blocks restarts). */
   setSessionActive?(active: boolean): void;
+
+  /**
+   * Native Picture-in-Picture for shells where the web API isn't available
+   * (Android's WebView): the whole app becomes the PiP window.
+   */
+  enterPictureInPicture?(): Promise<void>;
+  /**
+   * Hardware/gesture back (Android). The handler returns true if it
+   * navigated within the app; otherwise the shell backgrounds the app.
+   */
+  onBackButton?(handler: () => boolean): () => void;
 }

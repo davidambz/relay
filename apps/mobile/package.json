@@ -1,0 +1,25 @@
+{
+  "name": "@relay/mobile",
+  "productName": "Relay",
+  "description": "Relay viewer for Android",
+  "author": "David Ambrozio",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "sync": "vite build && cap sync android",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
+    "@relay/core": "*",
+    "@relay/ui": "*"
+  }
+}

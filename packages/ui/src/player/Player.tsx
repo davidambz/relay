@@ -48,7 +48,9 @@ export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWi
   const floatingMode = platform.capabilities.floating;
   const canFloat =
     (floatingMode === "window" && onFloatingWindow !== undefined) ||
-    (floatingMode === "pip" && typeof document !== "undefined" && document.pictureInPictureEnabled === true);
+    (floatingMode === "pip" &&
+      (platform.enterPictureInPicture !== undefined ||
+        (typeof document !== "undefined" && document.pictureInPictureEnabled === true)));
 
   const openFloating = useCallback(() => {
     if (!canFloat) return;
@@ -56,9 +58,13 @@ export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWi
       onFloatingWindow?.();
       return;
     }
-    // Phones and browsers: the system's own Picture-in-Picture.
-    void videoRef.current?.requestPictureInPicture().catch((error) => console.warn("PiP failed", error));
-  }, [canFloat, floatingMode, onFloatingWindow]);
+    // Phones and browsers: the system's own Picture-in-Picture, natively
+    // where the shell provides it (Android), else the web API.
+    const request = platform.enterPictureInPicture
+      ? platform.enterPictureInPicture()
+      : videoRef.current?.requestPictureInPicture();
+    void request?.catch((error) => console.warn("PiP failed", error));
+  }, [canFloat, floatingMode, onFloatingWindow, platform]);
 
   // Shortcuts: global while the player is on screen, except when typing.
   useEffect(() => {
