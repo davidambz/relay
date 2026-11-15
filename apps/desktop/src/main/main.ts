@@ -124,7 +124,12 @@ function registerDisplayMediaHandler() {
   // deliberately not offered (Chromium's loopback would include Discord);
   // system audio comes from the audiocap helper instead (main/audio.ts).
   session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
-    const sources = await desktopCapturer.getSources({ types: ["screen", "window"] });
+    // Only the id matters here: a 0x0 thumbnail skips rendering a
+    // preview of every window just to find the one already chosen.
+    const sources = await desktopCapturer.getSources({
+      types: ["screen", "window"],
+      thumbnailSize: { width: 0, height: 0 },
+    });
     const source = sources.find((candidate) => candidate.id === chosenSourceId);
     chosenSourceId = null;
     if (source) {
