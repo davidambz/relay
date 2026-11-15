@@ -2,7 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Scale pinned at 1 (MainActivity makes the WebView honour this tag):
+         Picture-in-Picture shrinks the whole app, and an adjustable scale
+         got zoomed to fit the tiny window and stayed that way after. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
     <meta name="color-scheme" content="dark light" />
     <title>Relay</title>
   </head>

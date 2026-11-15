@@ -143,6 +143,23 @@ describe("Player", () => {
     expect(player.hasAttribute("data-pip")).toBe(true);
   });
 
+  it("shows the controls again when coming back from PiP", () => {
+    vi.useFakeTimers();
+    const platform = fakePlatform();
+    const audio = { volume: 1, muted: false, setVolume: () => {}, setMuted: () => {}, toggleMuted: () => {} };
+    const ui = (pictureInPicture: boolean) => (
+      <PlatformContext.Provider value={platform}>
+        <Player stream={null} code="ABC234" audio={audio} onLeave={() => {}} pictureInPicture={pictureInPicture} />
+      </PlatformContext.Provider>
+    );
+    const { container, rerender } = render(ui(true));
+    const player = container.querySelector("[data-chrome]") as HTMLElement;
+    act(() => vi.advanceTimersByTime(AUTO_HIDE_MS + 100));
+    expect(player.dataset.chrome).toBe("hidden");
+    rerender(ui(false));
+    expect(player.dataset.chrome).toBe("shown");
+  });
+
   it("asks the shell for immersive landscape while fullscreen, and restores it after", async () => {
     const setImmersive = vi.fn(async () => {});
     const platform = fakePlatform({ setImmersive });

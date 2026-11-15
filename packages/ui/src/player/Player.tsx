@@ -50,6 +50,14 @@ export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWi
     video.muted = muted;
   }, [volume, muted]);
 
+  // Coming back from the system's PiP window: bring the controls back
+  // right away (they were hidden there, and the countdown ran out).
+  const wasPictureInPicture = useRef(pictureInPicture);
+  useEffect(() => {
+    if (wasPictureInPicture.current && !pictureInPicture) chrome.show();
+    wasPictureInPicture.current = pictureInPicture;
+  }, [pictureInPicture, chrome]);
+
   // Phones: fullscreen also means no system bars and landscape. Leaving
   // fullscreen (or the player) puts both back.
   const { setImmersive } = platform;
