@@ -41,6 +41,8 @@ export const ptBR: Strings = {
     fps60Hint: "Jogos e vídeo",
     fps30Hint: "Texto e código",
     applyFailed: "Não foi possível aplicar essa qualidade nessa fonte.",
+    audioLabel: "Transmitir som",
+    audioDescription: "Uma janela manda só o som do próprio programa. Um monitor manda tudo, menos o Discord.",
   },
   live: {
     previewLabel: "Prévia",

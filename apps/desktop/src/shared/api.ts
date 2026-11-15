@@ -15,6 +15,11 @@ export interface InstanceInfo {
 export interface RelayDesktopApi {
   appVersion: string;
   instance: InstanceInfo;
+  /** native/audiocap is present, so broadcasts can carry system audio. */
+  audioAvailable: boolean;
+  /** Starts audiocap for a source; a MessagePort with PCM follows via window.postMessage. */
+  audioStart(sourceId: string): Promise<void>;
+  audioStop(): Promise<void>;
   listSources(): Promise<CaptureSource[]>;
   chooseSource(id: string): Promise<void>;
   getTheme(): Promise<Theme>;
@@ -34,4 +39,7 @@ export const IPC = {
   storeGet: "store:get",
   storeSet: "store:set",
   copyText: "clipboard:write",
+  audioStart: "audio:start",
+  audioStop: "audio:stop",
+  audioPort: "audio:port",
 } as const;

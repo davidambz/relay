@@ -3,6 +3,7 @@
 
 import type { Platform } from "@relay/core";
 import type { RelayDesktopApi } from "../shared/api";
+import { startSystemAudio } from "./systemAudio";
 
 declare global {
   interface Window {
@@ -15,7 +16,7 @@ export function createDesktopPlatform(api: RelayDesktopApi = window.relay): Plat
   return {
     kind: "desktop",
     appVersion: api.appVersion,
-    capabilities: { host: true, systemAudio: false, floating: "window", selfUpdate: false },
+    capabilities: { host: true, systemAudio: api.audioAvailable, floating: "window", selfUpdate: false },
     listSources: () => api.listSources(),
     async captureSource(id, options) {
       // Tell main which source our picker chose, then ask Chromium for it;
@@ -26,6 +27,14 @@ export function createDesktopPlatform(api: RelayDesktopApi = window.relay): Plat
         audio: false,
       });
       for (const track of stream.getVideoTracks()) track.contentHint = options.contentHint;
+      if (options.audio && api.audioAvailable) {
+        try {
+          stream.addTrack(await startSystemAudio(api, id));
+        } catch (error) {
+          // Video alone is still a working broadcast.
+          console.warn("Couldn't start system audio", error);
+        }
+      }
       return stream;
     },
     getSystemTheme: () => api.getTheme(),
