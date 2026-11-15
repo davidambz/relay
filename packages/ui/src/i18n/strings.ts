@@ -30,6 +30,10 @@ export interface Strings {
     back: string;
     start: string;
     starting: string;
+    /** Picking a new source for a live broadcast. */
+    switchTo: string;
+    switching: string;
+    cancelSwitch: string;
     captureFailed: string;
   };
   quality: {
@@ -44,6 +48,9 @@ export interface Strings {
   };
   live: {
     previewLabel: string;
+    changeSource: string;
+    switchingNotice: string;
+    switchFailed: string;
     codeLabel: string;
     copy: string;
     copied: string;

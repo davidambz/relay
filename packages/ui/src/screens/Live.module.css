@@ -18,12 +18,18 @@
 }
 
 .sourceName {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 60%;
+}
+
+.changeSource {
+  flex: none;
 }
 
 /* The share code is the hero of this screen: a recessed, lit equipment

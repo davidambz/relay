@@ -32,6 +32,9 @@ export const ptBR: Strings = {
     back: "Voltar",
     start: "Iniciar transmissão",
     starting: "Iniciando…",
+    switchTo: "Transmitir esta fonte",
+    switching: "Trocando…",
+    cancelSwitch: "Cancelar",
     captureFailed: "Não foi possível capturar essa fonte. Atualize a lista e escolha de novo.",
   },
   quality: {
@@ -45,6 +48,9 @@ export const ptBR: Strings = {
     audioDescription: "Uma janela manda só o som do próprio programa. Um monitor manda tudo, menos o Discord.",
   },
   live: {
+    changeSource: "Trocar fonte",
+    switchingNotice: "Escolha a nova fonte. A transmissão continua no ar com o mesmo código, e quem está assistindo passa a ver a nova fonte.",
+    switchFailed: "Não foi possível trocar a fonte. A transmissão continua com a fonte anterior.",
     previewLabel: "Prévia",
     codeLabel: "Código",
     copy: "Copiar",

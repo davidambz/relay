@@ -32,18 +32,28 @@ interface SourcePickerProps {
   notice?: string;
   onBack: () => void;
   onStarted: (broadcast: StartedBroadcast) => void;
+  /**
+   * "switch": picking a new source for a live broadcast. The sound choice
+   * is fixed by the broadcast (`audio`), so its toggle is hidden, and the
+   * buttons read as switching rather than starting.
+   */
+  mode?: "start" | "switch";
+  /** With mode "switch": capture sound with the new source or not. */
+  audio?: boolean;
 }
 
 type LoadState = { status: "loading" } | { status: "ready"; sources: CaptureSource[] } | { status: "failed" };
 
-export function SourcePicker({ notice, onBack, onStarted }: SourcePickerProps) {
+export function SourcePicker({ notice, onBack, onStarted, mode = "start", audio: fixedAudio }: SourcePickerProps) {
+  const switching = mode === "switch";
   const { t } = useI18n();
   const platform = usePlatform();
   const [kind, setKind] = useState<CaptureSourceKind>("screen");
   const [load, setLoad] = useState<LoadState>({ status: "loading" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [quality, setQuality] = useStreamQuality();
-  const [audio, setAudio] = useBroadcastAudio();
+  const [savedAudio, setAudio] = useBroadcastAudio();
+  const audio = switching ? (fixedAudio ?? false) : savedAudio;
   const canSendAudio = platform.capabilities.systemAudio;
   const [starting, setStarting] = useState(false);
   const [captureError, setCaptureError] = useState(false);
@@ -191,7 +201,7 @@ export function SourcePicker({ notice, onBack, onStarted }: SourcePickerProps) {
           {t.picker.qualityLabel}
         </h2>
         <QualityPicker value={quality} onChange={setQuality} />
-        {canSendAudio && (
+        {canSendAudio && !switching && (
           <Toggle
             label={t.quality.audioLabel}
             description={t.quality.audioDescription}
@@ -209,10 +219,16 @@ export function SourcePicker({ notice, onBack, onStarted }: SourcePickerProps) {
 
       <div className={screen.actions}>
         <Button variant="ghost" onClick={onBack}>
-          <BackIcon /> {t.picker.back}
+          <BackIcon /> {switching ? t.picker.cancelSwitch : t.picker.back}
         </Button>
         <Button variant="primary" disabled={!selected || starting} onClick={() => void start()}>
-          {starting ? t.picker.starting : t.picker.start}
+          {switching
+            ? starting
+              ? t.picker.switching
+              : t.picker.switchTo
+            : starting
+              ? t.picker.starting
+              : t.picker.start}
         </Button>
       </div>
     </div>

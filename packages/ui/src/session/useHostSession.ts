@@ -1,7 +1,7 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HostSession, loadSessionConfig, type EncoderSettings } from "@relay/core";
 import { usePlatform } from "../platform/PlatformContext";
 import { usePeerFactory } from "./PeerFactoryContext";
@@ -11,14 +11,18 @@ export type HostState =
   | { status: "live"; code: string; viewers: string[]; maxViewers?: number; signaling: boolean }
   | { status: "failed"; reason: string };
 
+export interface HostControls {
+  /** New encoder settings for every viewer, mid-broadcast. */
+  setEncoderSettings: (settings: EncoderSettings) => void;
+  /** Broadcast another source under the same code (see HostSession.replaceSource). */
+  replaceSource: (next: MediaStream) => Promise<void>;
+}
+
 /**
  * Runs a HostSession for as long as the component is mounted with this
  * stream. To retry after a failure, remount (change the component key).
  */
-export function useHostSession(
-  stream: MediaStream,
-  encoder: EncoderSettings,
-): [HostState, (settings: EncoderSettings) => void] {
+export function useHostSession(stream: MediaStream, encoder: EncoderSettings): [HostState, HostControls] {
   const platform = usePlatform();
   const createPeer = usePeerFactory();
   const [state, setState] = useState<HostState>({ status: "starting" });
@@ -75,5 +79,12 @@ export function useHostSession(
     sessionRef.current?.setEncoderSettings(settings);
   }, []);
 
-  return [state, setEncoderSettings];
+  const replaceSource = useCallback(async (next: MediaStream) => {
+    const session = sessionRef.current;
+    if (!session) throw new Error("No broadcast to switch");
+    await session.replaceSource(next);
+  }, []);
+
+  const controls = useMemo(() => ({ setEncoderSettings, replaceSource }), [setEncoderSettings, replaceSource]);
+  return [state, controls];
 }

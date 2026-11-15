@@ -31,7 +31,13 @@ class FakeEmitter {
 const tick = (fn: () => void) => queueMicrotask(fn);
 
 export class FakeSender {
-  readonly track = { kind: "video" };
+  track: { kind: string; id?: string } | null = { kind: "video" };
+  /** Tracks handed to replaceTrack, in order. */
+  readonly replaced: (MediaStreamTrack | null)[] = [];
+  async replaceTrack(track: MediaStreamTrack | null) {
+    this.replaced.push(track);
+    this.track = track;
+  }
   readonly applied: number[] = [];
   readonly degradation: (RTCDegradationPreference | undefined)[] = [];
   getParameters() {
@@ -84,7 +90,15 @@ export class FakeMediaConnection extends FakeEmitter implements MediaConnectionL
   sdpTransform?: (sdp: string) => string;
   answered = false;
   readonly sender = new FakeSender();
-  readonly peerConnection = { getSenders: () => [this.sender] } as unknown as RTCPeerConnection;
+  /** Present when the call carries sound (the host's stream had an audio track). */
+  readonly audioSender: FakeSender | null;
+  readonly peerConnection = {
+    getSenders: () => [this.sender, ...(this.audioSender ? [this.audioSender] : [])],
+    getTransceivers: () => [
+      { sender: this.sender, receiver: { track: { kind: "video" } } },
+      ...(this.audioSender ? [{ sender: this.audioSender, receiver: { track: { kind: "audio" } } }] : []),
+    ],
+  } as unknown as RTCPeerConnection;
   private closed = false;
   readonly peer: string;
   readonly outgoingStream?: MediaStream;
@@ -92,6 +106,9 @@ export class FakeMediaConnection extends FakeEmitter implements MediaConnectionL
     super();
     this.peer = peer;
     this.outgoingStream = outgoingStream;
+    const hasAudio = typeof outgoingStream?.getAudioTracks === "function" && outgoingStream.getAudioTracks().length > 0;
+    this.audioSender = hasAudio ? new FakeSender() : null;
+    if (this.audioSender) this.audioSender.track = { kind: "audio" };
   }
   answer(_stream?: MediaStream, options?: { sdpTransform?: (sdp: string) => string }) {
     this.answered = true;
@@ -204,5 +221,30 @@ export class FakeNetwork {
   /** Pretend someone else already holds this id on the server. */
   occupy(id: string) {
     this.peers.set(id, new FakePeer(this, id, { iceServers: [] }));
+  }
+}
+
+/** A MediaStream stand-in with real track bookkeeping (add/remove/get by kind). */
+export class FakeStream {
+  readonly id: string;
+  private tracks: MediaStreamTrack[];
+  constructor(id: string, tracks: { kind: string; id: string }[]) {
+    this.id = id;
+    this.tracks = tracks as unknown as MediaStreamTrack[];
+  }
+  getTracks() {
+    return [...this.tracks];
+  }
+  getVideoTracks() {
+    return this.tracks.filter((track) => track.kind === "video");
+  }
+  getAudioTracks() {
+    return this.tracks.filter((track) => track.kind === "audio");
+  }
+  addTrack(track: MediaStreamTrack) {
+    if (!this.tracks.includes(track)) this.tracks.push(track);
+  }
+  removeTrack(track: MediaStreamTrack) {
+    this.tracks = this.tracks.filter((candidate) => candidate !== track);
   }
 }

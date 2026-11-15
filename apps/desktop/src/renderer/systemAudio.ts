@@ -23,7 +23,7 @@ function nextAudioPort(): Promise<MessagePort> {
  */
 export async function startSystemAudio(api: RelayDesktopApi, sourceId: string): Promise<MediaStreamTrack> {
   const portReady = nextAudioPort();
-  await api.audioStart(sourceId);
+  const captureId = await api.audioStart(sourceId);
   const port = await portReady;
 
   const context = new AudioContext({ sampleRate: 48000, latencyHint: "interactive" });
@@ -44,7 +44,9 @@ export async function startSystemAudio(api: RelayDesktopApi, sourceId: string): 
   track.stop = () => {
     stopTrack();
     port.close();
-    void api.audioStop();
+    // Only this capture: after a source switch the new one is already
+    // running when the old track gets stopped.
+    void api.audioStop(captureId);
     void context.close();
   };
   return track;

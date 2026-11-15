@@ -4,7 +4,7 @@
 import { DEFAULT_SESSION_CONFIG, type SessionConfig } from "./config";
 import { HostSession, HostSessionError } from "./host";
 import { enableOpusStereo } from "./sdp";
-import { FakeNetwork, type FakeMediaConnection } from "./testing/fakePeer";
+import { FakeNetwork, FakeStream, type FakeMediaConnection } from "./testing/fakePeer";
 import { VIEWER_STREAM_TIMEOUT_MS, ViewerSession, type ViewerEndReason } from "./viewer";
 
 const stream = { id: "host-stream" } as unknown as MediaStream;
@@ -190,6 +190,47 @@ describe("host and viewer together", () => {
     firstConn.close();
     await flush();
     expect(viewerLists.at(-1)).toHaveLength(1);
+  });
+
+  it("switches every viewer to a new source without reconnecting", async () => {
+    const network = new FakeNetwork();
+    const live = new FakeStream("live", [{ kind: "video", id: "v1" }, { kind: "audio", id: "a1" }]);
+    const host = new HostSession(live as unknown as MediaStream, config(), network.factory, { makeCode: codes("ABC234") });
+    await host.start();
+    const first = watch(network, "ABC234");
+    await flush();
+    const next = new FakeStream("next", [{ kind: "video", id: "v2" }, { kind: "audio", id: "a2" }]);
+    await host.replaceSource(next as unknown as MediaStream);
+
+    const call = network.peers.get("relay-tenno-v1-ABC234")!.calls[0];
+    expect(call.sender.replaced.map((track) => track?.id)).toEqual(["v2"]);
+    expect(call.audioSender!.replaced.map((track) => track?.id)).toEqual(["a2"]);
+    // The same stream object now carries the new tracks, for later viewers.
+    expect(live.getTracks().map((track) => track.id)).toEqual(["v2", "a2"]);
+    expect(host.code).toBe("ABC234");
+    expect(first.result.ended).toBeUndefined();
+  });
+
+  it("silences sound when the new source has none, and never adds sound a broadcast didn't have", async () => {
+    const network = new FakeNetwork();
+    const withSound = new FakeStream("a", [{ kind: "video", id: "v1" }, { kind: "audio", id: "a1" }]);
+    const host = new HostSession(withSound as unknown as MediaStream, config(), network.factory, { makeCode: codes("ABC234") });
+    await host.start();
+    watch(network, "ABC234");
+    await flush();
+    await host.replaceSource(new FakeStream("b", [{ kind: "video", id: "v2" }]) as unknown as MediaStream);
+    const call = network.peers.get("relay-tenno-v1-ABC234")!.calls[0];
+    expect(call.audioSender!.replaced).toEqual([null]);
+
+    const network2 = new FakeNetwork();
+    const silent = new FakeStream("c", [{ kind: "video", id: "v1" }]);
+    const host2 = new HostSession(silent as unknown as MediaStream, config(), network2.factory, { makeCode: codes("ABC234") });
+    await host2.start();
+    watch(network2, "ABC234");
+    await flush();
+    await host2.replaceSource(new FakeStream("d", [{ kind: "video", id: "v2" }, { kind: "audio", id: "a2" }]) as unknown as MediaStream);
+    expect(silent.getTracks().map((track) => track.id)).toEqual(["v2"]);
+    expect(network2.peers.get("relay-tenno-v1-ABC234")!.calls[0].audioSender).toBeNull();
   });
 
   it("drops a viewer from the count when they leave", async () => {

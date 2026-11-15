@@ -71,10 +71,13 @@ function registerIpc() {
   });
   ipcMain.handle(IPC.audioStart, async (event, sourceId: unknown) => {
     if (typeof sourceId !== "string") throw new Error("sourceId must be a string");
-    const mode = await startAudio(event.sender, sourceId);
+    const { id, mode } = await startAudio(event.sender, sourceId);
     console.log("System audio:", mode.kind, "pid" in mode ? mode.pid : "");
+    return id;
   });
-  ipcMain.handle(IPC.audioStop, (event) => stopAudio(event.sender.id));
+  ipcMain.handle(IPC.audioStop, (event, captureId: unknown) =>
+    stopAudio(event.sender.id, typeof captureId === "number" ? captureId : undefined),
+  );
   ipcMain.handle(IPC.updateGetStatus, () => getUpdateStatus());
   ipcMain.handle(IPC.updateCheck, async () => {
     await checkForUpdate();

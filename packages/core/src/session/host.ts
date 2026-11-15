@@ -209,6 +209,47 @@ export class HostSession {
     if (notify) this.viewersChanged();
   }
 
+  /**
+   * Switches what's being broadcast (another monitor or window) without
+   * ending it: same code, and every viewer keeps its connection.
+   *
+   * The new tracks go onto each viewer's existing senders with
+   * replaceTrack, so nothing renegotiates. The broadcast's stream object
+   * itself is updated in place, so viewers who join later get the new
+   * tracks too. A kind the broadcast never had a sender for (sound, when
+   * it started without any) can't be added this way and is left out;
+   * a kind the new source lacks is replaced with nothing (silence).
+   *
+   * The caller stops the old tracks afterwards.
+   */
+  async replaceSource(next: MediaStream): Promise<void> {
+    const video = next.getVideoTracks()[0] ?? null;
+    const audio = next.getAudioTracks()[0] ?? null;
+    const hadAudio = this.stream.getAudioTracks().length > 0;
+    for (const track of this.stream.getTracks()) this.stream.removeTrack(track);
+    if (video) this.stream.addTrack(video);
+    if (audio && hadAudio) this.stream.addTrack(audio);
+
+    const replacements: Promise<void>[] = [];
+    for (const viewer of this.viewers.values()) {
+      const pc = viewer.call.peerConnection;
+      if (!pc) continue; // not negotiated yet: it will pick up this.stream
+      for (const transceiver of pc.getTransceivers()) {
+        const kind = transceiver.receiver.track?.kind;
+        const track = kind === "video" ? video : kind === "audio" ? audio : undefined;
+        if (track === undefined) continue;
+        replacements.push(
+          transceiver.sender
+            .replaceTrack(track)
+            .catch((error) => console.warn("Couldn't switch a viewer to the new source", error)),
+        );
+      }
+    }
+    await Promise.all(replacements);
+    // A new track starts without the encoder settings' context; reapply.
+    this.applyEncoderSettings();
+  }
+
   /** Changes encoder settings for every viewer mid-broadcast (no renegotiation). */
   setEncoderSettings(settings: EncoderSettings) {
     this.encoder = { ...this.encoder, ...settings };
