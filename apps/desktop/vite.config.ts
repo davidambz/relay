@@ -10,8 +10,12 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "media-src 'self' blob: mediastream:",
-  // PeerJS signaling (wss) and STUN/TURN config fetches, from stage 2 on.
-  "connect-src 'self' https: wss:",
+  // PeerJS signaling. http:/ws: too, for a self-hosted server without TLS
+  // (session.server.secure = false, e.g. on a LAN).
+  "connect-src 'self' https: wss: http: ws:",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
 ].join("; ");
 
 function productionCsp(): Plugin {
