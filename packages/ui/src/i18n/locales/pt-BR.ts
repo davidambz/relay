@@ -73,6 +73,17 @@ export const ptBR: Strings = {
     timeout: "Não foi possível receber o vídeo. Um firewall ou a rede pode estar bloqueando a conexão.",
     network: "Não foi possível falar com o servidor de conexão. Confira sua internet e tente de novo.",
   },
+  updates: {
+    heading: "Atualizações",
+    currentVersion: (version) => `Relay ${version}`,
+    check: "Procurar atualizações",
+    checking: "Procurando…",
+    upToDate: "Você está na versão mais recente.",
+    available: (version) => `A versão ${version} está disponível.`,
+    updateNow: "Atualizar agora",
+    installing: (version) => `Instalando a ${version}. O Relay vai reiniciar.`,
+    failed: "Não foi possível procurar atualizações. Tente mais tarde.",
+  },
   viewing: {
     label: "Transmissão",
     connecting: (code) => `Conectando a ${code}…`,

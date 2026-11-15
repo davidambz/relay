@@ -1,11 +1,12 @@
 # Only used to produce the unpacked app folder (release/win-unpacked).
-# The installer itself is Inno Setup (installer/relay.iss, stage 6), same
-# as Umbra, so there's deliberately no nsis target here.
+# The installer itself is Inno Setup (installer/relay.iss), same as
+# Umbra, so there's deliberately no nsis target here.
 appId: com.davidambz.relay
 productName: Relay
 copyright: Copyright (C) 2026 David Ambrozio
 directories:
   output: release
+  buildResources: build
 files:
   - dist-electron/**
   - dist-renderer/**
@@ -13,3 +14,13 @@ files:
 asar: true
 win:
   target: dir
+  icon: build/icon.ico
+  signAndEditExecutable: true
+# Native helpers ship next to the app and are found through
+# process.resourcesPath/bin (src/main/nativeTools.ts). Build them first
+# with CMake (native/*/build).
+extraResources:
+  - from: ../../native/audiocap/build/audiocap.exe
+    to: bin/audiocap.exe
+  - from: ../../native/winlist/build/winlist.exe
+    to: bin/winlist.exe

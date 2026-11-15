@@ -47,6 +47,23 @@ export interface KeyValueStore {
   set<T>(key: string, value: T): Promise<void>;
 }
 
+export type UpdateStatus =
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "up-to-date" }
+  | { state: "available"; latestVersion: string }
+  | { state: "downloading"; latestVersion: string }
+  | { state: "installing"; latestVersion: string }
+  | { state: "failed"; reason: string };
+
+export interface UpdatesApi {
+  getStatus(): Promise<UpdateStatus>;
+  check(): Promise<void>;
+  /** Downloads and installs; the app restarts. Rejects during a session. */
+  apply(): Promise<void>;
+  onStatus(listener: (status: UpdateStatus) => void): () => void;
+}
+
 export interface Platform {
   kind: "desktop" | "mobile" | "web";
   capabilities: PlatformCapabilities;
@@ -65,4 +82,9 @@ export interface Platform {
 
   /** Copies text to the system clipboard. Rejects if it couldn't. */
   copyText(text: string): Promise<void>;
+
+  /** Self-update, where capabilities.selfUpdate is true. */
+  updates?: UpdatesApi;
+  /** Tells the shell a broadcast or viewer session is running (blocks restarts). */
+  setSessionActive?(active: boolean): void;
 }

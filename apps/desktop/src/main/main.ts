@@ -10,6 +10,7 @@ import { claimInstanceProfile } from "./instance";
 import { storeGet, storeSet } from "./store";
 import { hwndFromSourceId, listOpenWindows } from "./windowList";
 import { isAudioAvailable, startAudio, stopAllAudio, stopAudio } from "./audio";
+import { applyUpdate, checkForUpdate, getUpdateStatus, scheduleUpdateChecks, setSessionActive } from "./updater";
 
 const instanceNumber = claimInstanceProfile();
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
@@ -74,6 +75,12 @@ function registerIpc() {
     console.log("System audio:", mode.kind, "pid" in mode ? mode.pid : "");
   });
   ipcMain.handle(IPC.audioStop, (event) => stopAudio(event.sender.id));
+  ipcMain.handle(IPC.updateGetStatus, () => getUpdateStatus());
+  ipcMain.handle(IPC.updateCheck, async () => {
+    await checkForUpdate();
+  });
+  ipcMain.handle(IPC.updateApply, () => applyUpdate());
+  ipcMain.on(IPC.sessionActive, (_event, active: unknown) => setSessionActive(active === true));
   ipcMain.handle(IPC.copyText, (_event, text: unknown) => {
     if (typeof text !== "string" || text.length > 1000) throw new Error("copyText expects a short string");
     clipboard.writeText(text);
@@ -129,6 +136,7 @@ function createWindow() {
         `--relay-version=${app.getVersion()}`,
         `--relay-instance=${instanceNumber}`,
         `--relay-audio=${isAudioAvailable() ? "1" : "0"}`,
+        `--relay-packaged=${app.isPackaged ? "1" : "0"}`,
       ],
     },
   });
@@ -297,6 +305,7 @@ app.whenReady().then(() => {
   registerIpc();
   registerDisplayMediaHandler();
   createWindow();
+  scheduleUpdateChecks();
 });
 
 app.on("window-all-closed", () => app.quit());

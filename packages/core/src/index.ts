@@ -5,3 +5,4 @@ export * from "./code";
 export * from "./locale";
 export type * from "./platform";
 export * from "./session";
+export * from "./updates";

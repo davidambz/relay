@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { BroadcastIcon, WatchIcon } from "../components/icons";
 import { useI18n } from "../i18n/I18nContext";
 import { usePlatform } from "../platform/PlatformContext";
+import { UpdatesPanel } from "../components/UpdatesPanel";
 import screen from "./Screen.module.css";
 import styles from "./Home.module.css";
 
@@ -47,6 +48,7 @@ export function Home({ onBroadcast, onWatch }: HomeProps) {
           </Button>
         </section>
       </div>
+      <UpdatesPanel />
     </div>
   );
 }

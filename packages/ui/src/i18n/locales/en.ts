@@ -73,6 +73,17 @@ export const en: Strings = {
     timeout: "Couldn't receive the video. A firewall or the network may be blocking the connection.",
     network: "Couldn't reach the connection server. Check your internet and try again.",
   },
+  updates: {
+    heading: "Updates",
+    currentVersion: (version) => `Relay ${version}`,
+    check: "Check for updates",
+    checking: "Checking…",
+    upToDate: "You're on the latest version.",
+    available: (version) => `Version ${version} is available.`,
+    updateNow: "Update now",
+    installing: (version) => `Installing ${version}. Relay will restart.`,
+    failed: "Couldn't check for updates. Try again later.",
+  },
   viewing: {
     label: "Broadcast",
     connecting: (code) => `Connecting to ${code}…`,

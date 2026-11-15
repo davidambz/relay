@@ -71,6 +71,17 @@ export interface Strings {
     timeout: string;
     network: string;
   };
+  updates: {
+    heading: string;
+    currentVersion: (version: string) => string;
+    check: string;
+    checking: string;
+    upToDate: string;
+    available: (version: string) => string;
+    updateNow: string;
+    installing: (version: string) => string;
+    failed: string;
+  };
   viewing: {
     label: string;
     connecting: (code: string) => string;

@@ -16,7 +16,7 @@ export function createDesktopPlatform(api: RelayDesktopApi = window.relay): Plat
   return {
     kind: "desktop",
     appVersion: api.appVersion,
-    capabilities: { host: true, systemAudio: api.audioAvailable, floating: "window", selfUpdate: false },
+    capabilities: { host: true, systemAudio: api.audioAvailable, floating: "window", selfUpdate: api.packaged },
     listSources: () => api.listSources(),
     async captureSource(id, options) {
       // Tell main which source our picker chose, then ask Chromium for it;
@@ -47,5 +47,14 @@ export function createDesktopPlatform(api: RelayDesktopApi = window.relay): Plat
     // Through main: the renderer's navigator.clipboard needs document
     // focus, which a click doesn't always guarantee in Electron.
     copyText: (text) => api.copyText(text),
+    updates: api.packaged
+      ? {
+          getStatus: () => api.updateGetStatus(),
+          check: () => api.updateCheck(),
+          apply: () => api.updateApply(),
+          onStatus: (listener) => api.onUpdateStatus(listener),
+        }
+      : undefined,
+    setSessionActive: (active) => api.setSessionActive(active),
   };
 }

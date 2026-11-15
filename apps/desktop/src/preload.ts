@@ -3,7 +3,7 @@
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { IPC, type RelayDesktopApi } from "./shared/api";
-import type { Theme } from "@relay/core";
+import type { Theme, UpdateStatus } from "@relay/core";
 
 // Sync values the main process passes through additionalArguments, so the
 // renderer has them at startup without an extra round trip.
@@ -18,6 +18,16 @@ const api: RelayDesktopApi = {
   audioAvailable: argValue("audio") === "1",
   audioStart: (sourceId) => ipcRenderer.invoke(IPC.audioStart, sourceId),
   audioStop: () => ipcRenderer.invoke(IPC.audioStop),
+  packaged: argValue("packaged") === "1",
+  updateGetStatus: () => ipcRenderer.invoke(IPC.updateGetStatus),
+  updateCheck: () => ipcRenderer.invoke(IPC.updateCheck),
+  updateApply: () => ipcRenderer.invoke(IPC.updateApply),
+  onUpdateStatus(listener) {
+    const handler = (_event: IpcRendererEvent, status: UpdateStatus) => listener(status);
+    ipcRenderer.on(IPC.updateStatus, handler);
+    return () => ipcRenderer.removeListener(IPC.updateStatus, handler);
+  },
+  setSessionActive: (active) => ipcRenderer.send(IPC.sessionActive, active),
   listSources: () => ipcRenderer.invoke(IPC.listSources),
   chooseSource: (id) => ipcRenderer.invoke(IPC.chooseSource, id),
   getTheme: () => ipcRenderer.invoke(IPC.getTheme),
