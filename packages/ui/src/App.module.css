@@ -1,0 +1,12 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* The one scrolling region (body itself never scrolls, as in Umbra). */
+.main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
