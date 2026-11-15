@@ -9,6 +9,7 @@ import { IPC } from "../shared/api";
 import { claimInstanceProfile } from "./instance";
 import { storeGet, storeSet } from "./store";
 import { hwndFromSourceId, listOpenWindows } from "./windowList";
+import { isAudioAvailable, startAudio, stopAllAudio, stopAudio } from "./audio";
 
 const instanceNumber = claimInstanceProfile();
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
@@ -67,6 +68,12 @@ function registerIpc() {
   ipcMain.handle(IPC.storeSet, (_event, key: unknown, value: unknown) => {
     if (typeof key === "string") storeSet(key, value);
   });
+  ipcMain.handle(IPC.audioStart, async (event, sourceId: unknown) => {
+    if (typeof sourceId !== "string") throw new Error("sourceId must be a string");
+    const mode = await startAudio(event.sender, sourceId);
+    console.log("System audio:", mode.kind, "pid" in mode ? mode.pid : "");
+  });
+  ipcMain.handle(IPC.audioStop, (event) => stopAudio(event.sender.id));
   ipcMain.handle(IPC.copyText, (_event, text: unknown) => {
     if (typeof text !== "string" || text.length > 1000) throw new Error("copyText expects a short string");
     clipboard.writeText(text);
@@ -85,7 +92,7 @@ function registerDisplayMediaHandler() {
   // getDisplayMedia() in the renderer lands here instead of Chromium's
   // own picker: we hand back whatever source our picker chose. Audio is
   // deliberately not offered (Chromium's loopback would include Discord);
-  // see the phase 2 audiocap helper in CLAUDE.md.
+  // system audio comes from the audiocap helper instead (main/audio.ts).
   session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
     const sources = await desktopCapturer.getSources({ types: ["screen", "window"] });
     const source = sources.find((candidate) => candidate.id === chosenSourceId);
@@ -118,7 +125,11 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       autoplayPolicy: "no-user-gesture-required",
-      additionalArguments: [`--relay-version=${app.getVersion()}`, `--relay-instance=${instanceNumber}`],
+      additionalArguments: [
+        `--relay-version=${app.getVersion()}`,
+        `--relay-instance=${instanceNumber}`,
+        `--relay-audio=${isAudioAvailable() ? "1" : "0"}`,
+      ],
     },
   });
   mainWindow = window;
@@ -289,3 +300,4 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => app.quit());
+app.on("will-quit", () => stopAllAudio());

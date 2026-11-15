@@ -15,6 +15,9 @@ function argValue(name: string): string | undefined {
 const api: RelayDesktopApi = {
   appVersion: argValue("version") ?? "0.0.0",
   instance: { number: Number(argValue("instance") ?? "1") },
+  audioAvailable: argValue("audio") === "1",
+  audioStart: (sourceId) => ipcRenderer.invoke(IPC.audioStart, sourceId),
+  audioStop: () => ipcRenderer.invoke(IPC.audioStop),
   listSources: () => ipcRenderer.invoke(IPC.listSources),
   chooseSource: (id) => ipcRenderer.invoke(IPC.chooseSource, id),
   getTheme: () => ipcRenderer.invoke(IPC.getTheme),
@@ -30,3 +33,9 @@ const api: RelayDesktopApi = {
 };
 
 contextBridge.exposeInMainWorld("relay", api);
+
+// MessagePorts can't cross contextBridge; forward them to the page with
+// window.postMessage, the pattern Electron documents for isolated worlds.
+ipcRenderer.on(IPC.audioPort, (event) => {
+  window.postMessage({ type: "relay-audio-port" }, "*", event.ports);
+});
