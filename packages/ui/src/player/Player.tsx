@@ -1,13 +1,14 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useEffect, useMemo, useRef, type PointerEvent } from "react";
-import { BackIcon, ExitFullscreenIcon, FullscreenIcon, MutedIcon, VolumeIcon } from "../components/icons";
+import { useCallback, useEffect, useMemo, useRef, type PointerEvent } from "react";
+import { BackIcon, ExitFullscreenIcon, FullscreenIcon, MiniPlayerIcon, MutedIcon, VolumeIcon } from "../components/icons";
 import { useI18n } from "../i18n/I18nContext";
+import { usePlatform } from "../platform/PlatformContext";
 import { actionForKey, isTypingTarget } from "./shortcuts";
 import { useAutoHide } from "./useAutoHide";
 import { useFullscreen } from "./useFullscreen";
-import { canSetVolume, useVolume } from "./useVolume";
+import { canSetVolume, type VolumeControls } from "./useVolume";
 import styles from "./Player.module.css";
 
 interface PlayerProps {
@@ -15,16 +16,21 @@ interface PlayerProps {
   code: string;
   /** Shown centered on the stage while there's no stream yet. */
   placeholder?: string;
+  /** Shared with the mini player, so both always agree. */
+  audio: VolumeControls;
   onLeave: () => void;
+  /** Open the shell's mini-player window (capabilities.floating === "window"). */
+  onFloatingWindow?: () => void;
 }
 
-export function Player({ stream, code, placeholder, onLeave }: PlayerProps) {
+export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWindow }: PlayerProps) {
   const { t } = useI18n();
+  const platform = usePlatform();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const chrome = useAutoHide();
   const fullscreen = useFullscreen(containerRef);
-  const { volume, muted, setVolume, toggleMuted } = useVolume();
+  const { volume, muted, setVolume, toggleMuted } = audio;
   const volumeSupported = useMemo(() => canSetVolume(), []);
 
   useEffect(() => {
@@ -39,6 +45,21 @@ export function Player({ stream, code, placeholder, onLeave }: PlayerProps) {
     video.muted = muted;
   }, [volume, muted]);
 
+  const floatingMode = platform.capabilities.floating;
+  const canFloat =
+    (floatingMode === "window" && onFloatingWindow !== undefined) ||
+    (floatingMode === "pip" && typeof document !== "undefined" && document.pictureInPictureEnabled === true);
+
+  const openFloating = useCallback(() => {
+    if (!canFloat) return;
+    if (floatingMode === "window") {
+      onFloatingWindow?.();
+      return;
+    }
+    // Phones and browsers: the system's own Picture-in-Picture.
+    void videoRef.current?.requestPictureInPicture().catch((error) => console.warn("PiP failed", error));
+  }, [canFloat, floatingMode, onFloatingWindow]);
+
   // Shortcuts: global while the player is on screen, except when typing.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -47,13 +68,14 @@ export function Player({ stream, code, placeholder, onLeave }: PlayerProps) {
       if (!action) return;
       if (action === "fullscreen") void fullscreen.toggle();
       else if (action === "mute") toggleMuted();
-      else return; // "floating" arrives with the floating player
+      else if (action === "floating" && canFloat) openFloating();
+      else return;
       event.preventDefault();
       chrome.show();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [fullscreen, toggleMuted, chrome]);
+  }, [fullscreen, toggleMuted, chrome, canFloat, openFloating]);
 
   function onStagePointer(event: PointerEvent<HTMLDivElement>) {
     if (event.pointerType === "touch") return;
@@ -131,6 +153,17 @@ export function Player({ stream, code, placeholder, onLeave }: PlayerProps) {
             aria-label={t.viewing.volume}
             style={{ "--fill": `${(muted ? 0 : volume) * 100}%` } as React.CSSProperties}
           />
+        )}
+        {canFloat && (
+          <button
+            type="button"
+            className={styles.control}
+            onClick={openFloating}
+            aria-label={t.viewing.miniPlayer}
+            title={t.viewing.miniPlayer}
+          >
+            <MiniPlayerIcon />
+          </button>
         )}
         <button
           type="button"

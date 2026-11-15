@@ -73,5 +73,7 @@ export interface Strings {
     volume: string;
     fullscreen: string;
     exitFullscreen: string;
+    miniPlayer: string;
+    returnToMain: string;
   };
 }

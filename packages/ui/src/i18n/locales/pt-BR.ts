@@ -75,5 +75,7 @@ export const ptBR: Strings = {
     volume: "Volume",
     fullscreen: "Tela cheia (F)",
     exitFullscreen: "Sair da tela cheia (F)",
+    miniPlayer: "Mini player (P)",
+    returnToMain: "Voltar para a janela principal (P)",
   },
 };

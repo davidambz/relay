@@ -6,8 +6,14 @@ import { PlatformContext } from "../platform/PlatformContext";
 import { fakePlatform } from "../test/fakePlatform";
 import { AUTO_HIDE_MS } from "./useAutoHide";
 import { Player } from "./Player";
+import { useVolume } from "./useVolume";
 
-function renderPlayer(storage = new Map<string, unknown>()) {
+function PlayerWithAudio(props: { onLeave: () => void; onFloatingWindow?: () => void }) {
+  const audio = useVolume();
+  return <Player stream={null} code="ABC234" placeholder="Connecting…" audio={audio} {...props} />;
+}
+
+function renderPlayer(storage = new Map<string, unknown>(), onFloatingWindow?: () => void) {
   const platform = fakePlatform({
     storage: {
       get: async <T,>(key: string) => storage.get(key) as T | undefined,
@@ -17,7 +23,7 @@ function renderPlayer(storage = new Map<string, unknown>()) {
   const onLeave = vi.fn();
   const utils = render(
     <PlatformContext.Provider value={platform}>
-      <Player stream={null} code="ABC234" placeholder="Connecting…" onLeave={onLeave} />
+      <PlayerWithAudio onLeave={onLeave} onFloatingWindow={onFloatingWindow} />
       <input aria-label="elsewhere" />
     </PlatformContext.Provider>,
   );
@@ -86,6 +92,19 @@ describe("Player", () => {
     expect(storage.get("player.volume")).toBe(0.6);
     expect(storage.get("player.muted")).toBe(false);
     expect(screen.getByRole("button", { name: "Mute (M)" })).toBeInTheDocument();
+  });
+
+  it("opens the mini player with its button and P", () => {
+    const onFloatingWindow = vi.fn();
+    renderPlayer(undefined, onFloatingWindow);
+    fireEvent.click(screen.getByRole("button", { name: "Mini player (P)" }));
+    fireEvent.keyDown(window, { key: "p" });
+    expect(onFloatingWindow).toHaveBeenCalledTimes(2);
+  });
+
+  it("has no mini player button when the shell can't float", () => {
+    renderPlayer();
+    expect(screen.queryByRole("button", { name: "Mini player (P)" })).not.toBeInTheDocument();
   });
 
   it("calls onLeave from the Leave control", () => {
