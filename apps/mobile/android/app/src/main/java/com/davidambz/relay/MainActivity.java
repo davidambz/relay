@@ -18,6 +18,12 @@ public class MainActivity extends BridgeActivity {
         // The stream arrives a moment after the tap on "Watch"; let it start
         // playing (with sound) without needing a second gesture.
         getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
+        // Honour the page's viewport tag (width=device-width, scale pinned
+        // at 1). Without it the WebView picks its own page scale, and
+        // shrinking into the tiny Picture-in-Picture window zoomed the page
+        // out to fit, a scale that stuck after coming back full size (the
+        // app no longer fit the screen and scrolled sideways).
+        getBridge().getWebView().getSettings().setUseWideViewPort(true);
     }
 
     private PipPlugin pip() {
