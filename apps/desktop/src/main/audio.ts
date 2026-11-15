@@ -55,18 +55,22 @@ function argsFor(mode: AudioMode): string[] {
 }
 
 interface Capture {
+  /** Identifies this capture, so stopping an old one can't stop its successor. */
+  id: number;
   child: ChildProcessWithoutNullStreams;
   port: MessagePortMain;
 }
 
 const captures = new Map<number, Capture>();
+let nextCaptureId = 1;
 
 /**
  * Starts audiocap for a renderer and hands it a MessagePort that receives
  * ArrayBuffers of interleaved float32 48 kHz stereo PCM. Replaces any
- * capture that renderer already had.
+ * capture that renderer already had (switching sources mid-broadcast).
+ * Resolves with the capture's id, for stopAudio.
  */
-export async function startAudio(contents: WebContents, sourceId: string): Promise<AudioMode> {
+export async function startAudio(contents: WebContents, sourceId: string): Promise<{ id: number; mode: AudioMode }> {
   const exe = resolveNativeTool("audiocap");
   if (!exe) throw new Error("audiocap.exe not found");
   stopAudio(contents.id);
@@ -74,7 +78,8 @@ export async function startAudio(contents: WebContents, sourceId: string): Promi
 
   const child = spawn(exe, argsFor(mode), { windowsHide: true });
   const { port1, port2 } = new MessageChannelMain();
-  captures.set(contents.id, { child, port: port1 });
+  const id = nextCaptureId++;
+  captures.set(contents.id, { id, child, port: port1 });
   contents.postMessage("audio:port", null, [port2]);
   port1.start();
 
@@ -97,12 +102,13 @@ export async function startAudio(contents: WebContents, sourceId: string): Promi
     if (code) console.warn("audiocap exited with code", code);
   });
   contents.once("destroyed", () => stopAudio(contents.id));
-  return mode;
+  return { id, mode };
 }
 
-export function stopAudio(contentsId: number) {
+/** Stops a renderer's capture; with `captureId`, only if it's still that one. */
+export function stopAudio(contentsId: number, captureId?: number) {
   const capture = captures.get(contentsId);
-  if (!capture) return;
+  if (!capture || (captureId !== undefined && capture.id !== captureId)) return;
   captures.delete(contentsId);
   capture.port.close();
   // Closing stdin is audiocap's clean stop signal; kill if it lingers.

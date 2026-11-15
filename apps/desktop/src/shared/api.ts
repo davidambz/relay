@@ -17,9 +17,14 @@ export interface RelayDesktopApi {
   instance: InstanceInfo;
   /** native/audiocap is present, so broadcasts can carry system audio. */
   audioAvailable: boolean;
-  /** Starts audiocap for a source; a MessagePort with PCM follows via window.postMessage. */
-  audioStart(sourceId: string): Promise<void>;
-  audioStop(): Promise<void>;
+  /**
+   * Starts audiocap for a source (replacing this window's previous one);
+   * a MessagePort with PCM follows via window.postMessage. Resolves with
+   * the capture's id.
+   */
+  audioStart(sourceId: string): Promise<number>;
+  /** Stops that capture, if it's still the current one. */
+  audioStop(captureId: number): Promise<void>;
   /** Packaged build (installed through Inno Setup): self-update is possible. */
   packaged: boolean;
   updateGetStatus(): Promise<UpdateStatus>;

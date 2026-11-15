@@ -4,13 +4,13 @@
 import { useEffect, useRef, useState } from "react";
 import { applyQualityToTrack, videoProfileFor, type StreamQuality } from "@relay/core";
 import { Button } from "../components/Button";
-import { CopyIcon } from "../components/icons";
+import { CopyIcon, RefreshIcon } from "../components/icons";
 import { QualityPicker } from "../components/QualityPicker";
 import { Toggle } from "../components/Toggle";
 import { useI18n } from "../i18n/I18nContext";
 import { usePlatform } from "../platform/PlatformContext";
 import { useHostSession } from "../session/useHostSession";
-import type { StartedBroadcast } from "./SourcePicker";
+import { SourcePicker, type StartedBroadcast } from "./SourcePicker";
 import screen from "./Screen.module.css";
 import styles from "./Live.module.css";
 
@@ -45,26 +45,65 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChang
     for (const track of broadcast.stream.getAudioTracks()) track.enabled = next;
     setAudioOn(next);
   }
-  const [session, setEncoderSettings] = useHostSession(broadcast.stream, encoderSettingsFor(broadcast.quality));
+  const [session, { setEncoderSettings, replaceSource }] = useHostSession(
+    broadcast.stream,
+    encoderSettingsFor(broadcast.quality),
+  );
   const [copied, setCopied] = useState(false);
   const live = session.status === "live" ? session : null;
+  // Picking another source mid-broadcast; the session keeps running.
+  const [switching, setSwitching] = useState(false);
+  const [switchError, setSwitchError] = useState(false);
+  const [sourceName, setSourceName] = useState(broadcast.sourceName);
+  // Bumped when the broadcast's tracks are swapped for a new source.
+  const [sourceVersion, setSourceVersion] = useState(0);
 
+  // The preview remounts after the picker closes and after a switch, so
+  // it's re-pointed at the (same, but re-tracked) stream each time.
   useEffect(() => {
     const video = videoRef.current;
-    if (video) video.srcObject = broadcast.stream;
+    if (!video) return;
+    video.srcObject = broadcast.stream;
     return () => {
-      if (video) video.srcObject = null;
+      video.srcObject = null;
     };
-  }, [broadcast.stream]);
+  }, [broadcast.stream, switching, sourceVersion]);
 
-  // Closing the shared window ends its video track; end the broadcast with it.
+  // Closing the shared window ends its video track; end the broadcast with
+  // it. Re-subscribed after a switch, to whichever source is live now.
   useEffect(() => {
     const [track] = broadcast.stream.getVideoTracks();
     if (!track) return;
     const handleEnded = () => onSourceEnded();
     track.addEventListener("ended", handleEnded);
     return () => track.removeEventListener("ended", handleEnded);
-  }, [broadcast.stream, onSourceEnded]);
+  }, [broadcast.stream, onSourceEnded, sourceVersion]);
+
+  async function switchSource(next: StartedBroadcast) {
+    const oldTracks = broadcast.stream.getTracks();
+    try {
+      await replaceSource(next.stream);
+    } catch (error) {
+      console.error("Couldn't switch the source", error);
+      for (const track of next.stream.getTracks()) track.stop();
+      setSwitchError(true);
+      setSwitching(false);
+      return;
+    }
+    for (const track of oldTracks) track.stop();
+    // Sound stays as the broadcaster left it (muted stays muted).
+    for (const track of broadcast.stream.getAudioTracks()) track.enabled = audioOn;
+    setSourceName(next.sourceName);
+    if (next.quality.resolution !== quality.resolution || next.quality.fps !== quality.fps) {
+      setQuality(next.quality);
+      onQualityChange(next.quality);
+    }
+    // A new track: reapply encoder settings for its quality either way.
+    setEncoderSettings(encoderSettingsFor(next.quality));
+    setSwitchError(false);
+    setSourceVersion((version) => version + 1);
+    setSwitching(false);
+  }
 
   useEffect(() => {
     if (!copied) return;
@@ -97,8 +136,25 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChang
     }
   }
 
+  if (switching) {
+    return (
+      <SourcePicker
+        mode="switch"
+        audio={hasAudio}
+        notice={t.live.switchingNotice}
+        onBack={() => setSwitching(false)}
+        onStarted={(next) => void switchSource(next)}
+      />
+    );
+  }
+
   return (
     <div className={screen.screen}>
+      {switchError && (
+        <p className={screen.error} role="alert">
+          {t.live.switchFailed}
+        </p>
+      )}
       {session.status === "failed" && (
         <div className={screen.error} role="alert">
           <p>{t.live.startFailed}</p>
@@ -119,12 +175,17 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChang
             <h2 id="live-preview" className="label">
               {t.live.previewLabel}
             </h2>
-            <span className={styles.sourceName} title={broadcast.sourceName}>
-              {broadcast.sourceName}
+            <span className={styles.sourceName} title={sourceName}>
+              {sourceName}
             </span>
+            {live && (
+              <Button variant="ghost" onClick={() => setSwitching(true)} className={styles.changeSource}>
+                <RefreshIcon /> {t.live.changeSource}
+              </Button>
+            )}
           </div>
           <div className={screen.bezel}>
-            <video ref={videoRef} className={screen.screenArea} autoPlay playsInline muted />
+            <video key={sourceVersion} ref={videoRef} className={screen.screenArea} autoPlay playsInline muted />
           </div>
         </section>
 

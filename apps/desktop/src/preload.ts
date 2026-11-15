@@ -17,7 +17,7 @@ const api: RelayDesktopApi = {
   instance: { number: Number(argValue("instance") ?? "1") },
   audioAvailable: argValue("audio") === "1",
   audioStart: (sourceId) => ipcRenderer.invoke(IPC.audioStart, sourceId),
-  audioStop: () => ipcRenderer.invoke(IPC.audioStop),
+  audioStop: (captureId) => ipcRenderer.invoke(IPC.audioStop, captureId),
   packaged: argValue("packaged") === "1",
   updateGetStatus: () => ipcRenderer.invoke(IPC.updateGetStatus),
   updateCheck: () => ipcRenderer.invoke(IPC.updateCheck),

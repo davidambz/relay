@@ -32,6 +32,9 @@ export const en: Strings = {
     back: "Back",
     start: "Start broadcast",
     starting: "Starting…",
+    switchTo: "Broadcast this source",
+    switching: "Switching…",
+    cancelSwitch: "Cancel",
     captureFailed: "Couldn't capture this source. Try refreshing the list and picking it again.",
   },
   quality: {
@@ -45,6 +48,9 @@ export const en: Strings = {
     audioDescription: "A window sends only its app's sound. A monitor sends everything except Discord.",
   },
   live: {
+    changeSource: "Change source",
+    switchingNotice: "Pick the new source. The broadcast stays live with the same code, and viewers switch over to it.",
+    switchFailed: "Couldn't switch the source. The broadcast carries on with the previous one.",
     previewLabel: "Preview",
     codeLabel: "Code",
     copy: "Copy",
