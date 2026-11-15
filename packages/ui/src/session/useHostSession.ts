@@ -44,13 +44,15 @@ export function useHostSession(
         onSignalingChange: (signaling) =>
           update((current) => (current.status === "live" ? { ...current, signaling } : current)),
       });
-      // Diagnostics handle (encoder stats per viewer), e.g. from DevTools:
-      // await relayDiagnostics.hostVideoStats()
       const current = session;
       sessionRef.current = session;
-      (globalThis as { relayDiagnostics?: object }).relayDiagnostics = {
-        hostVideoStats: () => current.getVideoStats(),
-      };
+      // Dev builds only: a diagnostics handle for DevTools (which packaged
+      // builds don't open anyway): await relayDiagnostics.hostVideoStats()
+      if (import.meta.env.DEV) {
+        (globalThis as { relayDiagnostics?: object }).relayDiagnostics = {
+          hostVideoStats: () => current.getVideoStats(),
+        };
+      }
       try {
         const code = await session.start();
         update(() => ({ status: "live", code, viewers: [], maxViewers: config.maxViewers, signaling: true }));

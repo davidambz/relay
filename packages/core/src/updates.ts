@@ -96,7 +96,8 @@ export function evaluateRelease(currentVersion: string, release: unknown, repo: 
           typeof asset.browser_download_url === "string",
       )
     : undefined;
-  if (!installer) return { status: "up-to-date", latestVersion: currentVersion };
+  // Nothing to offer yet; the release workflow is likely still attaching it.
+  if (!installer) return { status: "up-to-date" };
   const downloadUrl = installer.browser_download_url as string;
   if (!isReleaseDownload(downloadUrl, repo)) {
     return { status: "failed", reason: `installer URL isn't one of ${repo}'s release downloads` };

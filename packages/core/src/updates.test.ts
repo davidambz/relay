@@ -61,7 +61,7 @@ describe("evaluateRelease", () => {
   });
 
   it("doesn't offer a release whose installer isn't attached yet", () => {
-    expect(evaluateRelease("0.1.0", release("v0.2.0", [{ name: "notes.txt", browser_download_url: "x" }]))).toMatchObject({ status: "up-to-date" });
+    expect(evaluateRelease("0.1.0", release("v0.2.0", [{ name: "notes.txt", browser_download_url: "x" }]))).toEqual({ status: "up-to-date" });
   });
 
   it("treats odd tags as nothing to offer and a bad current version as a failure", () => {
