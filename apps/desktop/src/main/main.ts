@@ -8,6 +8,7 @@ import type { CaptureSource, Theme } from "@relay/core";
 import { IPC } from "../shared/api";
 import { claimInstanceProfile } from "./instance";
 import { storeGet, storeSet } from "./store";
+import { hwndFromSourceId, listOpenWindows } from "./windowList";
 
 const instanceNumber = claimInstanceProfile();
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
@@ -28,13 +29,23 @@ function backgroundFor(theme: Theme) {
 
 async function listSources(): Promise<CaptureSource[]> {
   const ownId = mainWindow?.getMediaSourceId();
-  const sources = await desktopCapturer.getSources({
-    types: ["screen", "window"],
-    thumbnailSize: { width: 400, height: 225 },
-    fetchWindowIcons: true,
-  });
+  const [sources, openWindows] = await Promise.all([
+    desktopCapturer.getSources({
+      types: ["screen", "window"],
+      thumbnailSize: { width: 400, height: 225 },
+      fetchWindowIcons: true,
+    }),
+    listOpenWindows(),
+  ]);
+  const openHwnds = openWindows ? new Set(openWindows.map((window) => window.hwnd)) : null;
+  const isOpenWindow = (id: string) => {
+    if (!openHwnds) return true;
+    const hwnd = hwndFromSourceId(id);
+    return hwnd !== null && openHwnds.has(hwnd);
+  };
   return sources
     .filter((source) => source.id !== ownId)
+    .filter((source) => source.id.startsWith("screen:") || isOpenWindow(source.id))
     .map((source) => ({
       id: source.id,
       kind: source.id.startsWith("screen:") ? "screen" : "window",

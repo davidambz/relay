@@ -9,4 +9,4 @@ release/
 # Planning docs stay local; only README.md is tracked (same rule as Umbra).
 *.md
 !README.md
-native/audiocap/build/
+native/*/build/
