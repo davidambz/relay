@@ -3,7 +3,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, nativeTheme, session, shell } from "electron";
+import { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, Menu, nativeTheme, session, shell } from "electron";
 import type { CaptureSource, Theme } from "@relay/core";
 import { IPC } from "../shared/api";
 import { claimInstanceProfile } from "./instance";
@@ -55,6 +55,10 @@ function registerIpc() {
   ipcMain.handle(IPC.storeGet, (_event, key: unknown) => (typeof key === "string" ? storeGet(key) : undefined));
   ipcMain.handle(IPC.storeSet, (_event, key: unknown, value: unknown) => {
     if (typeof key === "string") storeSet(key, value);
+  });
+  ipcMain.handle(IPC.copyText, (_event, text: unknown) => {
+    if (typeof text !== "string" || text.length > 1000) throw new Error("copyText expects a short string");
+    clipboard.writeText(text);
   });
 
   nativeTheme.on("updated", () => {

@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./peerjs": "./src/session/peerjs.ts"
+    "./peerjs": "./src/session/peerjs.ts",
+    "./testing": "./src/session/testing/fakePeer.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

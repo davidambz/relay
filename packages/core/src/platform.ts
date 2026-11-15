@@ -60,4 +60,7 @@ export interface Platform {
   getSystemLocale(): Promise<string>;
 
   storage: KeyValueStore;
+
+  /** Copies text to the system clipboard. Rejects if it couldn't. */
+  copyText(text: string): Promise<void>;
 }

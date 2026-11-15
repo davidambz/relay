@@ -50,5 +50,6 @@ export function createWebPlatform(): Platform {
       return navigator.language ?? "en";
     },
     storage: localStorageStore("relay:"),
+    copyText: (text) => navigator.clipboard.writeText(text),
   };
 }

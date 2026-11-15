@@ -22,6 +22,7 @@ export interface RelayDesktopApi {
   getLocale(): Promise<string>;
   storeGet(key: string): Promise<unknown>;
   storeSet(key: string, value: unknown): Promise<void>;
+  copyText(text: string): Promise<void>;
 }
 
 export const IPC = {
@@ -32,4 +33,5 @@ export const IPC = {
   getLocale: "locale:get",
   storeGet: "store:get",
   storeSet: "store:set",
+  copyText: "clipboard:write",
 } as const;

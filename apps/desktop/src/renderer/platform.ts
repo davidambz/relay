@@ -35,5 +35,8 @@ export function createDesktopPlatform(api: RelayDesktopApi = window.relay): Plat
       get: async <T,>(key: string) => (await api.storeGet(key)) as T | undefined,
       set: (key, value) => api.storeSet(key, value),
     },
+    // Through main: the renderer's navigator.clipboard needs document
+    // focus, which a click doesn't always guarantee in Electron.
+    copyText: (text) => api.copyText(text),
   };
 }

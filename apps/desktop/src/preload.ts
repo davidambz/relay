@@ -26,6 +26,7 @@ const api: RelayDesktopApi = {
   getLocale: () => ipcRenderer.invoke(IPC.getLocale),
   storeGet: (key) => ipcRenderer.invoke(IPC.storeGet, key),
   storeSet: (key, value) => ipcRenderer.invoke(IPC.storeSet, key, value),
+  copyText: (text) => ipcRenderer.invoke(IPC.copyText, text),
 };
 
 contextBridge.exposeInMainWorld("relay", api);
