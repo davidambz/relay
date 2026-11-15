@@ -5,6 +5,7 @@ export interface Strings {
   app: {
     statusIdle: string;
     statusLive: string;
+    statusWatching: string;
   };
   home: {
     broadcastLabel: string;

@@ -7,6 +7,7 @@ export const en: Strings = {
   app: {
     statusIdle: "Standby",
     statusLive: "On air",
+    statusWatching: "Watching",
   },
   home: {
     broadcastLabel: "Broadcast",

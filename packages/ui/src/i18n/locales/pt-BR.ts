@@ -7,6 +7,7 @@ export const ptBR: Strings = {
   app: {
     statusIdle: "Em espera",
     statusLive: "No ar",
+    statusWatching: "Assistindo",
   },
   home: {
     broadcastLabel: "Transmitir",
