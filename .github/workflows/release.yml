@@ -1,0 +1,91 @@
+name: Release
+
+# Pushing an annotated vX.Y.Z tag is the only way to cut a release (same
+# as Umbra): `git tag -a v0.2.0 -m "plain-language notes" && git push
+# origin v0.2.0`. There's no version file to bump; the tag is the version
+# and is injected into the app and the installer here. The tag message
+# becomes the release notes, written for the people downloading it.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Derive the version from the pushed tag
+        id: version
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint, typecheck and test (gate)
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build native helpers (audiocap, winlist)
+        run: |
+          foreach ($tool in "audiocap", "winlist") {
+            cmake -S "native/$tool" -B "native/$tool/build" -G Ninja -DCMAKE_BUILD_TYPE=Release
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            cmake --build "native/$tool/build"
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
+
+      - name: Stamp the version into the app
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --workspace @relay/desktop
+
+      - name: Package the app (electron-builder --dir)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run package --workspace @relay/desktop
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build the installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" apps\desktop\installer\relay.iss /DMyAppVersion="${{ steps.version.outputs.version }}"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Read release notes from the tag
+        run: |
+          $message = (git tag -l --format="%(contents)" "${{ github.ref_name }}") -join "`n"
+          if ([string]::IsNullOrWhiteSpace($message)) {
+            # A lightweight tag has no message; re-tag with `git tag -a`.
+            $message = "Relay ${{ steps.version.outputs.version }}."
+          }
+          Write-Host "Release notes read from tag ${{ github.ref_name }}:"
+          Write-Host $message
+          $message | Out-File -FilePath release-notes.md -Encoding utf8NoBOM
+
+      - name: Publish the GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            "apps/desktop/installer/output/RelaySetup-${{ steps.version.outputs.version }}.exe" `
+            --title "Relay ${{ steps.version.outputs.version }}" `
+            --notes-file release-notes.md
