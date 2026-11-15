@@ -51,6 +51,26 @@ describe("useChildWindow + FloatingPlayer", () => {
     expect(audio.toggleMuted).toHaveBeenCalled();
   });
 
+  it("returns to the main window on double-click and fades its controls when still", () => {
+    vi.useFakeTimers();
+    try {
+      const { child } = fakeChildWindow();
+      vi.spyOn(window, "open").mockReturnValue(child);
+      const onReturn = vi.fn();
+      render(<Harness onReturn={onReturn} onClosed={() => {}} />);
+      const root = child.document.querySelector("[data-chrome]") as HTMLElement;
+      expect(root.dataset.chrome).toBe("shown");
+      act(() => vi.advanceTimersByTime(3000));
+      expect(root.dataset.chrome).toBe("hidden");
+      fireEvent.pointerMove(root);
+      expect(root.dataset.chrome).toBe("shown");
+      fireEvent.doubleClick(child.document.querySelector("video")!);
+      expect(onReturn).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("closes the child when no longer open, without reporting it as user-closed", () => {
     const { child, close } = fakeChildWindow();
     vi.spyOn(window, "open").mockReturnValue(child);

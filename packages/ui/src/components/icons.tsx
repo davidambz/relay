@@ -137,3 +137,16 @@ export function CloseIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function GripIcon(props: IconProps) {
+  return (
+    <svg {...base(props)} strokeWidth={0} fill="currentColor">
+      <circle cx="8" cy="9" r="1.5" />
+      <circle cx="12" cy="9" r="1.5" />
+      <circle cx="16" cy="9" r="1.5" />
+      <circle cx="8" cy="15" r="1.5" />
+      <circle cx="12" cy="15" r="1.5" />
+      <circle cx="16" cy="15" r="1.5" />
+    </svg>
+  );
+}

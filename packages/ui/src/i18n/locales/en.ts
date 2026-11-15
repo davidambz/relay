@@ -77,5 +77,6 @@ export const en: Strings = {
     exitFullscreen: "Exit fullscreen (F)",
     miniPlayer: "Mini player (P)",
     returnToMain: "Back to the main window (P)",
+    dragMiniPlayer: "Drag to move",
   },
 };
