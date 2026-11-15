@@ -176,8 +176,9 @@ export class HostSession {
       // keep encoding and uploading without being counted or closed.
       const previous = this.viewers.get(conn.peer);
       if (previous) this.removeViewer(previous, false);
-      if (this.viewers.size >= this.config.maxViewers) {
-        const full: HostMessage = { type: "full", maxViewers: this.config.maxViewers };
+      const { maxViewers } = this.config;
+      if (maxViewers !== undefined && this.viewers.size >= maxViewers) {
+        const full: HostMessage = { type: "full", maxViewers };
         void conn.send(full);
         setTimeout(() => conn.close(), FLUSH_MS);
         if (previous) this.viewersChanged();

@@ -8,7 +8,8 @@ export interface SessionConfig {
   iceServers: RTCIceServer[];
   /** Custom PeerJS signaling server; undefined uses the free PeerJS cloud. */
   server?: PeerServerOptions;
-  maxViewers: number;
+  /** Optional cap on viewers; undefined lets anyone with the code in. */
+  maxViewers?: number;
   /**
    * Video codec to put first in negotiation (e.g. "H264"), or undefined
    * for the browser's default order.
@@ -23,7 +24,6 @@ export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   iceServers: DEFAULT_ICE_SERVERS,
-  maxViewers: 5,
   // Measured on Windows with an NVIDIA GPU while gaming, Smoothness mode:
   // Chromium's default VP8 ran in software (libvpx) at 13 fps; H.264 used
   // the hardware encoder (Media Foundation / NVENC) at 29 fps. Peers

@@ -15,7 +15,7 @@ Built for watching a friend's screen during a voice call: the broadcast can carr
   - sharing a **window** sends only that app's sound;
   - sharing a **monitor** sends everything except Discord (Stable, PTB and Canary);
   - sound can be muted mid-broadcast.
-- A big copyable code, a preview of what's going out, and one lamp per viewer seat. Closing the shared window ends the broadcast.
+- A big copyable code, a preview of what's going out, and a lamp for each viewer watching. Closing the shared window ends the broadcast.
 
 **Watching (Windows and Android)**
 
@@ -67,7 +67,7 @@ The installer isn't code-signed yet, so Windows SmartScreen may warn the first t
 
 - **Signaling** uses the free PeerJS cloud server by default. It only sees peer ids and connection setup; media never passes through it.
 - **NAT traversal** uses Google's public STUN servers. There is no TURN relay by default, so some networks (symmetric NAT, carrier-grade NAT, common on 4G) can't connect directly; the viewer then sees a "couldn't connect" message after 20 seconds. You can add a TURN server, see [Configuration](#configuration).
-- **Several viewers** are a mesh: each viewer gets its own connection, with its own encode and upload on the broadcaster's PC. The default limit is 5 viewers. The per-viewer bitrate steps down as people join (about 12 Mbps with 1–2 viewers, 10 with 3–4, 8 with 5) so the total upload stays reasonable. Larger audiences would need a media server, which is out of scope.
+- **Any number of viewers** can join. It's a mesh: each viewer gets its own connection, with its own encode and upload on the broadcaster's PC, so the per-viewer bitrate steps down as people join (about 12 Mbps with 1–2 viewers, 10 with 3–4, 8 with 5–6, 6 with 7–10, 4 beyond) to keep the total upload reasonable. In practice the broadcaster's upload and encoder set the ceiling; a large audience would need a media server, which is out of scope.
 - **Sound** comes from `audiocap.exe`, a small helper that uses Windows' per-process audio loopback (WASAPI process loopback). Chromium's own loopback would capture the whole system, Discord included. The helper streams 48 kHz stereo PCM to the app, which turns it into a WebRTC track sent as stereo Opus at 128 kbps.
 
 ### Privacy
@@ -78,7 +78,7 @@ The installer isn't code-signed yet, so Windows SmartScreen may warn the first t
 
 ## Configuration
 
-Relay keeps its settings in `%APPDATA%\Relay\settings.json`. Under the `session` key you can add a TURN server, point to your own [PeerJS server](https://github.com/peers/peerjs-server), or change the viewer limit:
+Relay keeps its settings in `%APPDATA%\Relay\settings.json`. Under the `session` key you can add a TURN server, point to your own [PeerJS server](https://github.com/peers/peerjs-server), or cap the number of viewers (there's no cap by default):
 
 ```json
 {

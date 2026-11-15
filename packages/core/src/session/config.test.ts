@@ -34,6 +34,6 @@ describe("loadSessionConfig", () => {
 
 describe("maxBitrateForViewers", () => {
   it("steps down as the audience grows", () => {
-    expect([1, 2, 3, 4, 5, 8].map(maxBitrateForViewers)).toEqual([12e6, 12e6, 10e6, 10e6, 8e6, 8e6]);
+    expect([1, 2, 3, 4, 5, 6, 7, 10, 11, 30].map(maxBitrateForViewers)).toEqual([12e6, 12e6, 10e6, 10e6, 8e6, 8e6, 6e6, 6e6, 4e6, 4e6]);
   });
 });

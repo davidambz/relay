@@ -150,15 +150,15 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChang
               </h2>
               <span className={styles.readout}>
                 <span className="tabularNums">
-                  {live ? t.live.viewersOf(live.viewers.length, live.maxViewers) : "–"}
+                  {live ? t.live.viewersCount(live.viewers.length, live.maxViewers) : "–"}
                 </span>
               </span>
             </div>
-            {live && (
-              // One lamp per seat: lit seats are connected viewers.
+            {live && live.viewers.length > 0 && (
+              // One lit lamp per connected viewer.
               <div className={styles.lamps} aria-hidden>
-                {Array.from({ length: live.maxViewers }, (_, index) => (
-                  <span key={index} className="lamp" data-lit={index < live.viewers.length} />
+                {live.viewers.map((id) => (
+                  <span key={id} className="lamp" data-lit />
                 ))}
               </div>
             )}
