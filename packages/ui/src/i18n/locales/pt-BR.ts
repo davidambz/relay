@@ -70,5 +70,10 @@ export const ptBR: Strings = {
     label: "Transmissão",
     connecting: (code) => `Conectando a ${code}…`,
     leave: "Sair",
+    mute: "Silenciar (M)",
+    unmute: "Ativar som (M)",
+    volume: "Volume",
+    fullscreen: "Tela cheia (F)",
+    exitFullscreen: "Sair da tela cheia (F)",
   },
 };

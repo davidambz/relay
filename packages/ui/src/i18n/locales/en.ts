@@ -70,5 +70,10 @@ export const en: Strings = {
     label: "Broadcast",
     connecting: (code) => `Connecting to ${code}…`,
     leave: "Leave",
+    mute: "Mute (M)",
+    unmute: "Unmute (M)",
+    volume: "Volume",
+    fullscreen: "Fullscreen (F)",
+    exitFullscreen: "Exit fullscreen (F)",
   },
 };

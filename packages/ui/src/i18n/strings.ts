@@ -68,5 +68,10 @@ export interface Strings {
     label: string;
     connecting: (code: string) => string;
     leave: string;
+    mute: string;
+    unmute: string;
+    volume: string;
+    fullscreen: string;
+    exitFullscreen: string;
   };
 }
