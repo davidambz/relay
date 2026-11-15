@@ -26,6 +26,8 @@ export type ContentHint = "detail" | "motion";
 
 export interface CaptureOptions {
   contentHint: ContentHint;
+  /** Add system audio (minus Discord, see audiocap) when the platform can. */
+  audio?: boolean;
   frameRate?: { ideal: number; max: number };
 }
 

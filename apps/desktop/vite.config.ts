@@ -34,5 +34,8 @@ export default defineConfig({
   build: {
     outDir: fileURLToPath(new URL("./dist-renderer", import.meta.url)),
     emptyOutDir: true,
+    // Never inline scripts as data: URLs (the audio worklet is small
+    // enough to be): the CSP only allows script-src 'self'.
+    assetsInlineLimit: (file) => (file.endsWith(".js") ? false : undefined),
   },
 });
