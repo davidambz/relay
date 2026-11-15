@@ -14,7 +14,11 @@ const SOURCES: CaptureSource[] = [
   { id: "window:42:0", kind: "window", name: "Notepad", thumbnail: "data:," },
 ];
 
-function renderPicker(captureSource = vi.fn(async () => new MediaStream())) {
+const applied = vi.fn(async () => {});
+const fakeStream = () =>
+  ({ getVideoTracks: () => [{ contentHint: "", applyConstraints: applied }] }) as unknown as MediaStream;
+
+function renderPicker(captureSource = vi.fn(async () => fakeStream())) {
   const onStarted = vi.fn();
   const platform = fakePlatform({ listSources: async () => SOURCES, captureSource });
   render(
@@ -52,10 +56,14 @@ describe("SourcePicker", () => {
     const { onStarted, captureSource } = renderPicker();
     expect(screen.getByRole("button", { name: "Start broadcast" })).toBeDisabled();
     await user.click(await screen.findByRole("radio", { name: "Monitor 2" }));
-    await user.click(screen.getByRole("radio", { name: /Smoothness/ }));
+    await user.click(screen.getByRole("radio", { name: "720p" }));
+    await user.click(screen.getByRole("radio", { name: /30 FPS/ }));
     await user.click(screen.getByRole("button", { name: "Start broadcast" }));
-    expect(captureSource).toHaveBeenCalledWith("screen:2:0", { contentHint: "motion", frameRate: { ideal: 60, max: 60 } });
-    expect(onStarted).toHaveBeenCalledWith(expect.objectContaining({ sourceName: "Monitor 2", contentHint: "motion" }));
+    expect(captureSource).toHaveBeenCalledWith("screen:2:0", { contentHint: "detail" });
+    expect(applied).toHaveBeenCalledWith(expect.objectContaining({ frameRate: { ideal: 30, max: 30 }, height: { max: 720 } }));
+    expect(onStarted).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceName: "Monitor 2", quality: { resolution: "720", fps: 30 } }),
+    );
   });
 
   it("shows an error and stays put when capture fails", async () => {
