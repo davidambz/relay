@@ -77,5 +77,6 @@ export const ptBR: Strings = {
     exitFullscreen: "Sair da tela cheia (F)",
     miniPlayer: "Mini player (P)",
     returnToMain: "Voltar para a janela principal (P)",
+    dragMiniPlayer: "Arraste para mover",
   },
 };
