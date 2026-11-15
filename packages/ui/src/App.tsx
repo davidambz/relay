@@ -39,11 +39,20 @@ export function App() {
     platform.setSessionActive?.(sessionActive);
   }, [platform, sessionActive]);
 
-  // Android back: step back through the screens; at home, leave the app.
-  // A live broadcast isn't ended by back (only by Stop).
+  // Android: the whole app is the PiP window; only the video should show.
+  const [pictureInPicture, setPictureInPicture] = useState(false);
+  useEffect(() => platform.onPictureInPictureChange?.(setPictureInPicture), [platform]);
+
+  // Android back: leave fullscreen first, then step back through the
+  // screens; at home, leave the app. A live broadcast isn't ended by
+  // back (only by Stop).
   useEffect(() => {
     if (!platform.onBackButton) return;
     return platform.onBackButton(() => {
+      if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {});
+        return true;
+      }
       let handled = true;
       setRoute((current) => {
         if (current.screen === "viewing") return { screen: "watch" };
@@ -79,7 +88,9 @@ export function App() {
 
   return (
     <div className={styles.app}>
-      <Header status={route.screen === "live" ? "live" : route.screen === "viewing" ? "watching" : "idle"} />
+      {!(pictureInPicture && route.screen === "viewing") && (
+        <Header status={route.screen === "live" ? "live" : route.screen === "viewing" ? "watching" : "idle"} />
+      )}
       <main className={styles.main}>
         {route.screen === "home" && (
           <Home onBroadcast={() => setRoute({ screen: "pick" })} onWatch={() => setRoute({ screen: "watch" })} />
@@ -115,6 +126,7 @@ export function App() {
         {route.screen === "viewing" && (
           <Viewing
             code={route.code}
+            pictureInPicture={pictureInPicture}
             onLeave={() => setRoute({ screen: "watch" })}
             onEnded={handleViewerEnded}
           />

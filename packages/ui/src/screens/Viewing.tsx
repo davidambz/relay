@@ -13,6 +13,8 @@ import styles from "./Viewing.module.css";
 
 interface ViewingProps {
   code: string;
+  /** The app is in the system's Picture-in-Picture window (Android). */
+  pictureInPicture?: boolean;
   onLeave: () => void;
   onEnded: (reason: ViewerEndReason) => void;
 }
@@ -22,7 +24,7 @@ interface ViewingProps {
  * mini-player window. Both players read one stream and one volume state;
  * only the visible one is fed the stream.
  */
-export function Viewing({ code, onLeave, onEnded }: ViewingProps) {
+export function Viewing({ code, onLeave, onEnded, pictureInPicture = false }: ViewingProps) {
   const { t } = useI18n();
   const session = useViewerSession(code);
   const audio = useVolume();
@@ -44,6 +46,7 @@ export function Viewing({ code, onLeave, onEnded }: ViewingProps) {
         audio={audio}
         onLeave={onLeave}
         onFloatingWindow={() => setFloating(true)}
+        pictureInPicture={pictureInPicture}
       />
       {floatingContainer && (
         <FloatingPlayer

@@ -3,7 +3,7 @@
 
 import { App } from "@capacitor/app";
 import type { KeyValueStore, Platform, Theme } from "@relay/core";
-import { RelayPip } from "./pip";
+import { RelayPip, RelayScreen } from "./pip";
 
 function prefersDark(): MediaQueryList {
   return window.matchMedia("(prefers-color-scheme: dark)");
@@ -56,6 +56,13 @@ export function createMobilePlatform(appVersion: string): Platform {
     setSessionActive(active) {
       // While watching: Home turns the app into a PiP window, screen stays on.
       void RelayPip.setWatching({ active }).catch(() => {});
+    },
+    async setImmersive(on) {
+      await RelayScreen.setImmersive({ on });
+    },
+    onPictureInPictureChange(listener) {
+      const handle = RelayPip.addListener("pipChanged", (state) => listener(state.active));
+      return () => void handle.then((registered) => registered.remove());
     },
     onBackButton(handler) {
       const listener = App.addListener("backButton", () => {
