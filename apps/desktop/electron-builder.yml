@@ -29,6 +29,9 @@ win:
 # process.resourcesPath/bin (src/main/nativeTools.ts). Build them first
 # with CMake (native/*/build).
 extraResources:
+  # The tray icon (src/main/tray.ts); the exe embeds its own copy.
+  - from: build/icon.ico
+    to: icon.ico
   - from: ../../native/audiocap/build/audiocap.exe
     to: bin/audiocap.exe
   - from: ../../native/winlist/build/winlist.exe

@@ -64,6 +64,9 @@ export interface UpdatesApi {
   onStatus(listener: (status: UpdateStatus) => void): () => void;
 }
 
+/** A broadcast or a viewer session in progress. */
+export type SessionKind = "broadcasting" | "watching";
+
 export interface Platform {
   kind: "desktop" | "mobile" | "web";
   capabilities: PlatformCapabilities;
@@ -85,8 +88,19 @@ export interface Platform {
 
   /** Self-update, where capabilities.selfUpdate is true. */
   updates?: UpdatesApi;
-  /** Tells the shell a broadcast or viewer session is running (blocks restarts). */
-  setSessionActive?(active: boolean): void;
+  /**
+   * Tells the shell what's running, if anything: it holds back update
+   * restarts during a session, and shells react in their own way (the
+   * desktop tray lights up and asks before quitting a broadcast; Android
+   * keeps the screen on and auto-enters PiP while watching).
+   */
+  setSession?(session: SessionKind | null): void;
+  /**
+   * Desktop: the app is about to quit mid-broadcast (from the tray, say).
+   * The handler asks the person and resolves true to quit and end the
+   * broadcast, false to keep going. Returns an unsubscribe function.
+   */
+  onQuitRequest?(handler: () => Promise<boolean>): () => void;
 
   /**
    * Native Picture-in-Picture for shells where the web API isn't available

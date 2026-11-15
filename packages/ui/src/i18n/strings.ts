@@ -47,6 +47,17 @@ export interface Strings {
     audioLabel: string;
     audioDescription: string;
   };
+  dialog: {
+    close: string;
+  };
+  /** Asked when quitting the app (e.g. from the tray) mid-broadcast. */
+  quitWhileLive: {
+    title: string;
+    message: string;
+    detail: string;
+    confirm: string;
+    cancel: string;
+  };
   live: {
     previewLabel: string;
     changeSource: string;

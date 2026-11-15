@@ -48,6 +48,16 @@ export const ptBR: Strings = {
     audioLabel: "Transmitir som",
     audioDescription: "Uma janela manda só o som do próprio programa. Um monitor manda tudo, menos o Discord.",
   },
+  dialog: {
+    close: "Fechar",
+  },
+  quitWhileLive: {
+    title: "Você está transmitindo",
+    message: "Sair do Relay e encerrar a transmissão?",
+    detail: "Quem está assistindo vai ser desconectado.",
+    confirm: "Sair e encerrar",
+    cancel: "Continuar transmitindo",
+  },
   live: {
     changeSource: "Trocar fonte",
     switchingNotice: "Escolha a nova fonte. A transmissão continua no ar com o mesmo código, e quem está assistindo passa a ver a nova fonte.",
