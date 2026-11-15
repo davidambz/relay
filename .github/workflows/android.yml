@@ -44,3 +44,20 @@ jobs:
           name: relay-android-debug
           path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+      # Proves the release key in the repository secrets still signs a
+      # valid APK, so a broken key shows up here instead of on release day.
+      # Nothing from this step is published.
+      - name: Verify release signing
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        working-directory: apps/mobile/android
+        env:
+          RELAY_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RELAY_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/relay-release.p12"
+          export RELAY_KEYSTORE_FILE="$RUNNER_TEMP/relay-release.p12"
+          ./gradlew assembleRelease --no-daemon -PrelayVersion=0.0.1
+          rm -f "$RUNNER_TEMP/relay-release.p12"
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          "$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
