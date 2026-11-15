@@ -130,11 +130,26 @@ function createWindow() {
     if (mainWindow === window) mainWindow = null;
   });
 
-  // No in-app navigation or popups yet (stage 4 opens the floating player
-  // through setWindowOpenHandler). External links go to the browser.
-  window.webContents.setWindowOpenHandler(({ url }) => {
+  // The only popup allowed is the mini player (an about:blank child the
+  // renderer portals into, see packages/ui useChildWindow). External links
+  // go to the browser; everything else is denied.
+  window.webContents.setWindowOpenHandler(({ url, frameName }) => {
+    if (frameName === FLOATING_WINDOW_NAME && url === "about:blank") {
+      return { action: "allow", overrideBrowserWindowOptions: floatingWindowOptions(window) };
+    }
     if (url.startsWith("https:")) void shell.openExternal(url);
     return { action: "deny" };
+  });
+  window.webContents.on("did-create-window", (child, details) => {
+    if (details.frameName !== FLOATING_WINDOW_NAME) return;
+    child.setAspectRatio(16 / 9);
+    child.setAlwaysOnTop(true, "floating");
+    child.setMenu(null);
+    // The mini player replaces the main window until it closes.
+    window.hide();
+    child.on("closed", () => {
+      if (!window.isDestroyed()) window.show();
+    });
   });
   window.webContents.on("will-navigate", (event, url) => {
     if (!devServerUrl || !url.startsWith(devServerUrl)) event.preventDefault();
@@ -157,6 +172,37 @@ function createWindow() {
   }
 }
 
+const FLOATING_WINDOW_NAME = "relay-floating";
+const FLOATING_SIZE = { width: 480, height: 270 };
+const FLOATING_MARGIN = 24;
+
+/** Frameless, always-on-top 16:9 window in the bottom-right of the main window's screen. */
+function floatingWindowOptions(owner: BrowserWindow): Electron.BrowserWindowConstructorOptions {
+  const { workArea } = screen.getDisplayMatching(owner.getBounds());
+  return {
+    ...FLOATING_SIZE,
+    x: workArea.x + workArea.width - FLOATING_SIZE.width - FLOATING_MARGIN,
+    y: workArea.y + workArea.height - FLOATING_SIZE.height - FLOATING_MARGIN,
+    minWidth: 240,
+    minHeight: 135,
+    frame: false,
+    resizable: true,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    backgroundColor: "#000000",
+    title: "Relay",
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      autoplayPolicy: "no-user-gesture-required",
+    },
+  };
+}
+
 /**
  * Dev-only: RELAY_DEV_DISPLAY=secondary opens the window on a non-primary
  * monitor (or RELAY_DEV_DISPLAY=<index>), so automated test runs stay off
@@ -172,6 +218,24 @@ function devWindowPlacement(): { x?: number; y?: number } {
   if (!display) return {};
   const offset = Number(process.env.RELAY_DEV_OFFSET ?? 0) || 0;
   return { x: display.workArea.x + 40 + offset, y: display.workArea.y + 40 + offset };
+}
+
+/**
+ * capturePage fails on some frameless always-on-top windows
+ * (UnknownVizError on the mini player); fall back to grabbing the window
+ * the way a screen share would.
+ */
+async function captureWindow(target: BrowserWindow): Promise<Electron.NativeImage> {
+  try {
+    return await target.webContents.capturePage();
+  } catch {
+    const id = target.getMediaSourceId();
+    const [width, height] = target.getContentSize();
+    const sources = await desktopCapturer.getSources({ types: ["window"], thumbnailSize: { width, height } });
+    const source = sources.find((candidate) => candidate.id === id);
+    if (!source) throw new Error(`Couldn't capture window ${id}`);
+    return source.thumbnail;
+  }
 }
 
 /**
@@ -192,8 +256,16 @@ function scheduleDevCapture(window: BrowserWindow, pngPath: string, script?: str
       // viewer started by the test harness), capturing at the end.
       const keepOpenMs = Number(process.env.RELAY_DEV_KEEP_OPEN_MS ?? 0) || 0;
       if (keepOpenMs > 0) await new Promise((resolve) => setTimeout(resolve, keepOpenMs));
-      const image = await window.webContents.capturePage();
-      fs.writeFileSync(pngPath, image.toPNG());
+      // Hidden windows never paint, so capturePage would wait forever on
+      // them (the main window hides while the mini player is open).
+      const visible = BrowserWindow.getAllWindows().filter((candidate) => candidate.isVisible());
+      for (const target of visible) {
+        const image = await captureWindow(target);
+        // Child windows (the mini player) get "<name>-child-N.png".
+        const index = visible.filter((other) => other !== window).indexOf(target);
+        const file = target === window ? pngPath : pngPath.replace(/\.png$/i, `-child-${index + 1}.png`);
+        fs.writeFileSync(file, image.toPNG());
+      }
     } catch (error) {
       console.error("Dev capture failed", error);
       process.exitCode = 1;
