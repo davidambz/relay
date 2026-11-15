@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { generateCode, peerIdForCode } from "../code";
-import { applySenderSettings, maxBitrateForViewers } from "./bitrate";
+import { applySenderSettings, maxBitrateForViewers, type SenderSettings } from "./bitrate";
 import type { SessionConfig } from "./config";
 import type { HostMessage } from "./messages";
 import type { DataConnectionLike, MediaConnectionLike, PeerError, PeerFactory, PeerLike } from "./peer";
@@ -47,6 +47,10 @@ interface Viewer {
   conn: DataConnectionLike;
   call: MediaConnectionLike;
   closed: boolean;
+  /** An encoder update is in flight for this viewer. */
+  applying: boolean;
+  /** The newest settings that arrived while one was in flight. */
+  queued: SenderSettings | null;
 }
 
 export class HostSessionError extends Error {
@@ -180,7 +184,7 @@ export class HostSession {
         return;
       }
       const call = peer.call(conn.peer, this.stream, { sdpTransform: this.sdpTransform });
-      const current: Viewer = { id: conn.peer, conn, call, closed: false };
+      const current: Viewer = { id: conn.peer, conn, call, closed: false, applying: false, queued: null };
       viewer = current;
       this.viewers.set(conn.peer, current);
       call.on("close", () => this.removeViewer(current));
@@ -216,15 +220,36 @@ export class HostSession {
   }
 
   private applyEncoderSettings() {
-    const settings = {
+    const settings: SenderSettings = {
       maxBitrate: Math.round(maxBitrateForViewers(this.viewers.size) * (this.encoder.bitrateScale ?? 1)),
       degradationPreference: this.encoder.degradationPreference,
     };
-    for (const viewer of this.viewers.values()) {
-      void applySenderSettings(() => viewer.call.peerConnection, settings, () => viewer.closed).catch((error) =>
-        console.warn("Couldn't apply the encoder settings", error),
-      );
+    for (const viewer of this.viewers.values()) void this.applyToViewer(viewer, settings);
+  }
+
+  /**
+   * One setParameters at a time per sender: overlapping calls (viewers
+   * joining close together) can fail on stale parameters and leave an
+   * older value in place. While one runs, only the newest settings wait.
+   */
+  private async applyToViewer(viewer: Viewer, settings: SenderSettings) {
+    if (viewer.applying) {
+      viewer.queued = settings;
+      return;
     }
+    viewer.applying = true;
+    let next: SenderSettings | null = settings;
+    while (next && !viewer.closed) {
+      const current: SenderSettings = next;
+      viewer.queued = null;
+      try {
+        await applySenderSettings(() => viewer.call.peerConnection, current, () => viewer.closed);
+      } catch (error) {
+        console.warn("Couldn't apply the encoder settings", error);
+      }
+      next = viewer.queued;
+    }
+    viewer.applying = false;
   }
 
   /** Per-viewer encoder stats, for diagnostics and a future stats readout. */

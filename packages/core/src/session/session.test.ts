@@ -8,7 +8,11 @@ import { FakeNetwork, type FakeMediaConnection } from "./testing/fakePeer";
 import { VIEWER_STREAM_TIMEOUT_MS, ViewerSession, type ViewerEndReason } from "./viewer";
 
 const stream = { id: "host-stream" } as unknown as MediaStream;
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+// A few macrotask turns: enough for connections to open and the fake
+// senders' async setParameters to settle.
+const flush = async () => {
+  for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+};
 const config = (overrides: Partial<SessionConfig> = {}): SessionConfig => ({ ...DEFAULT_SESSION_CONFIG, ...overrides });
 
 function codes(...values: string[]) {
@@ -120,8 +124,11 @@ describe("host and viewer together", () => {
     await host.start();
     for (let i = 0; i < 3; i++) watch(network, "ABC234");
     await flush();
+    await flush();
     const firstCall = network.peers.get("relay-tenno-v1-ABC234")!.calls[0];
-    expect(firstCall.sender.applied).toEqual([12_000_000, 12_000_000, 10_000_000]);
+    // The newest cap wins, and updates to one sender never overlap.
+    expect(firstCall.sender.applied.at(-1)).toBe(10_000_000);
+    expect(firstCall.sender.maxConcurrent).toBe(1);
   });
 
   it("turns away viewers past the limit", async () => {
