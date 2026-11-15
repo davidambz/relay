@@ -92,13 +92,25 @@ export class FakeMediaConnection extends FakeEmitter implements MediaConnectionL
   readonly sender = new FakeSender();
   /** Present when the call carries sound (the host's stream had an audio track). */
   readonly audioSender: FakeSender | null;
-  readonly peerConnection = {
-    getSenders: () => [this.sender, ...(this.audioSender ? [this.audioSender] : [])],
+  private readonly stateListeners = new Set<() => void>();
+  private state: RTCPeerConnectionState = "new";
+  /** Simulates the RTCPeerConnection moving to another connectionState. */
+  setConnectionState(state: RTCPeerConnectionState) {
+    this.state = state;
+    for (const listener of this.stateListeners) listener();
+  }
+  readonly peerConnection = ((owner: FakeMediaConnection) => ({
+    get connectionState(): RTCPeerConnectionState {
+      return owner.state;
+    },
+    addEventListener: (_type: string, listener: () => void) => owner.stateListeners.add(listener),
+    removeEventListener: (_type: string, listener: () => void) => owner.stateListeners.delete(listener),
+    getSenders: () => [owner.sender, ...(owner.audioSender ? [owner.audioSender] : [])],
     getTransceivers: () => [
-      { sender: this.sender, receiver: { track: { kind: "video" } } },
-      ...(this.audioSender ? [{ sender: this.audioSender, receiver: { track: { kind: "audio" } } }] : []),
+      { sender: owner.sender, receiver: { track: { kind: "video" } } },
+      ...(owner.audioSender ? [{ sender: owner.audioSender, receiver: { track: { kind: "audio" } } }] : []),
     ],
-  } as unknown as RTCPeerConnection;
+  }))(this) as unknown as RTCPeerConnection;
   private closed = false;
   readonly peer: string;
   readonly outgoingStream?: MediaStream;

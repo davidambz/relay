@@ -9,6 +9,14 @@ import type { DataConnectionLike, MediaConnectionLike, PeerError, PeerFactory, P
 import { sessionSdpTransform } from "./sdp";
 
 const MAX_CODE_ATTEMPTS = 5;
+/**
+ * A viewer whose connection stays "disconnected" this long is gone (app
+ * closed, phone killed it, network lost). Chromium may never move such a
+ * connection on to "failed", and PeerJS only drops a call on "failed".
+ */
+export const VIEWER_DISCONNECT_GRACE_MS = 8000;
+const PC_POLL_MS = 200;
+const PC_POLL_TIMEOUT_MS = 15_000;
 /** Time for a goodbye message to flush before its connection is torn down. */
 const FLUSH_MS = 300;
 
@@ -51,6 +59,8 @@ interface Viewer {
   applying: boolean;
   /** The newest settings that arrived while one was in flight. */
   queued: SenderSettings | null;
+  /** Undoes the connection-state watch (see watchHealth). */
+  unwatch?: () => void;
 }
 
 export class HostSessionError extends Error {
@@ -190,6 +200,7 @@ export class HostSession {
       this.viewers.set(conn.peer, current);
       call.on("close", () => this.removeViewer(current));
       call.on("error", () => this.removeViewer(current));
+      this.watchHealth(current);
       this.viewersChanged();
     });
     conn.on("close", () => viewer && this.removeViewer(viewer));
@@ -203,6 +214,7 @@ export class HostSession {
   private removeViewer(viewer: Viewer, notify = true) {
     if (viewer.closed) return;
     viewer.closed = true;
+    viewer.unwatch?.();
     if (this.viewers.get(viewer.id) === viewer) this.viewers.delete(viewer.id);
     viewer.call.close();
     viewer.conn.close();
@@ -248,6 +260,47 @@ export class HostSession {
     await Promise.all(replacements);
     // A new track starts without the encoder settings' context; reapply.
     this.applyEncoderSettings();
+  }
+
+  /**
+   * Drops a viewer whose media connection dies without a goodbye: at once
+   * on "failed"/"closed", or after a grace period of "disconnected" (a
+   * brief network hiccup recovers on its own and keeps the seat). This is
+   * what removes viewers who simply closed the app, including older
+   * builds that never say goodbye.
+   */
+  private watchHealth(viewer: Viewer) {
+    let pc: RTCPeerConnection | null = null;
+    let graceTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearGrace = () => {
+      if (graceTimer) clearTimeout(graceTimer);
+      graceTimer = null;
+    };
+    const onStateChange = () => {
+      const state = pc?.connectionState;
+      if (state === "failed" || state === "closed") {
+        this.removeViewer(viewer);
+      } else if (state === "disconnected") {
+        if (!graceTimer) graceTimer = setTimeout(() => this.removeViewer(viewer), VIEWER_DISCONNECT_GRACE_MS);
+      } else {
+        clearGrace();
+      }
+    };
+    // PeerJS creates the RTCPeerConnection a moment after peer.call().
+    const deadline = Date.now() + PC_POLL_TIMEOUT_MS;
+    const poll = setInterval(() => {
+      const candidate = viewer.call.peerConnection;
+      if (candidate || viewer.closed || Date.now() > deadline) clearInterval(poll);
+      if (!candidate || viewer.closed) return;
+      pc = candidate;
+      pc.addEventListener("connectionstatechange", onStateChange);
+      onStateChange();
+    }, PC_POLL_MS);
+    viewer.unwatch = () => {
+      clearInterval(poll);
+      clearGrace();
+      pc?.removeEventListener("connectionstatechange", onStateChange);
+    };
   }
 
   /** Changes encoder settings for every viewer mid-broadcast (no renegotiation). */

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { DEFAULT_SESSION_CONFIG, type SessionConfig } from "./config";
-import { HostSession, HostSessionError } from "./host";
+import { HostSession, HostSessionError, VIEWER_DISCONNECT_GRACE_MS } from "./host";
 import { enableOpusStereo } from "./sdp";
 import { FakeNetwork, FakeStream, type FakeMediaConnection } from "./testing/fakePeer";
 import { VIEWER_STREAM_TIMEOUT_MS, ViewerSession, type ViewerEndReason } from "./viewer";
@@ -231,6 +231,34 @@ describe("host and viewer together", () => {
     await host2.replaceSource(new FakeStream("d", [{ kind: "video", id: "v2" }, { kind: "audio", id: "a2" }]) as unknown as MediaStream);
     expect(silent.getTracks().map((track) => track.id)).toEqual(["v2"]);
     expect(network2.peers.get("relay-tenno-v1-ABC234")!.calls[0].audioSender).toBeNull();
+  });
+
+  it("drops a viewer whose connection dies without a goodbye", async () => {
+    vi.useFakeTimers();
+    try {
+      const network = new FakeNetwork();
+      const viewerLists: string[][] = [];
+      const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });
+      const starting = host.start();
+      await vi.advanceTimersByTimeAsync(0);
+      await starting;
+      for (let i = 0; i < 3; i++) watch(network, "ABC234");
+      await vi.advanceTimersByTimeAsync(500); // joined, health watch attached
+      const [closedApp, hiccup, failed] = network.peers.get("relay-tenno-v1-ABC234")!.calls;
+      expect(viewerLists.at(-1)).toHaveLength(3);
+
+      closedApp.setConnectionState("disconnected");
+      hiccup.setConnectionState("disconnected");
+      failed.setConnectionState("failed");
+      expect(viewerLists.at(-1)).toHaveLength(2); // failed: gone at once
+      await vi.advanceTimersByTimeAsync(VIEWER_DISCONNECT_GRACE_MS / 2);
+      hiccup.setConnectionState("connected"); // a brief blip keeps the seat
+      await vi.advanceTimersByTimeAsync(VIEWER_DISCONNECT_GRACE_MS);
+      expect(viewerLists.at(-1)).toHaveLength(1);
+      expect(viewerLists.at(-1)![0]).toBe(hiccup.peer);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("drops a viewer from the count when they leave", async () => {
