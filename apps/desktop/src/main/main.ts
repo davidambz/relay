@@ -10,7 +10,7 @@ import { claimInstanceProfile } from "./instance";
 import { storeGet, storeSet } from "./store";
 import { hwndFromSourceId, listOpenWindows } from "./windowList";
 import { isAudioAvailable, startAudio, stopAllAudio, stopAudio } from "./audio";
-import { applyUpdate, checkForUpdate, getUpdateStatus, scheduleUpdateChecks, setSessionActive } from "./updater";
+import { applyUpdate, checkForUpdate, getUpdateStatus, installOnQuit, scheduleUpdateChecks, setSessionActive } from "./updater";
 
 const instanceNumber = claimInstanceProfile();
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
@@ -309,4 +309,7 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => app.quit());
-app.on("will-quit", () => stopAllAudio());
+app.on("will-quit", () => {
+  stopAllAudio();
+  installOnQuit();
+});
