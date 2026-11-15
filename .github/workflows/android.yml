@@ -59,6 +59,12 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           RELEASE_CERT_SHA256: 653ccce1a10159263ac6106317e6c1a317b01e7f2d5dfebdf232cb3a8968dbf3
         run: |
+          # Runs GitHub gives no repository secrets (Dependabot PRs, forks)
+          # can't sign; the debug APK above already proves the build.
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::notice::No signing secrets in this run; skipping the release signing check."
+            exit 0
+          fi
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/relay-release.p12"
           export RELAY_KEYSTORE_FILE="$RUNNER_TEMP/relay-release.p12"
           ./gradlew assembleRelease --no-daemon -PrelayVersion=0.0.1
