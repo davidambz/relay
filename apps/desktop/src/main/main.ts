@@ -3,7 +3,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, nativeTheme, session, shell } from "electron";
+import { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, Menu, nativeTheme, screen, session, shell } from "electron";
 import type { CaptureSource, Theme } from "@relay/core";
 import { IPC } from "../shared/api";
 import { claimInstanceProfile } from "./instance";
@@ -67,6 +67,10 @@ function registerIpc() {
   ipcMain.handle(IPC.storeSet, (_event, key: unknown, value: unknown) => {
     if (typeof key === "string") storeSet(key, value);
   });
+  ipcMain.handle(IPC.copyText, (_event, text: unknown) => {
+    if (typeof text !== "string" || text.length > 1000) throw new Error("copyText expects a short string");
+    clipboard.writeText(text);
+  });
 
   nativeTheme.on("updated", () => {
     const theme = currentTheme();
@@ -99,6 +103,7 @@ function registerDisplayMediaHandler() {
 function createWindow() {
   const theme = currentTheme();
   const window = new BrowserWindow({
+    ...devWindowPlacement(),
     width: 1120,
     height: 760,
     minWidth: 400,
@@ -153,8 +158,25 @@ function createWindow() {
 }
 
 /**
- * Dev-only: optionally run a script in the page, then save a screenshot of
- * the window and quit. Lets the UI be checked from a terminal without
+ * Dev-only: RELAY_DEV_DISPLAY=secondary opens the window on a non-primary
+ * monitor (or RELAY_DEV_DISPLAY=<index>), so automated test runs stay off
+ * the screen someone is using. RELAY_DEV_OFFSET staggers several windows.
+ */
+function devWindowPlacement(): { x?: number; y?: number } {
+  const wanted = app.isPackaged ? undefined : process.env.RELAY_DEV_DISPLAY;
+  if (!wanted) return {};
+  const displays = screen.getAllDisplays();
+  const primaryId = screen.getPrimaryDisplay().id;
+  const display =
+    wanted === "secondary" ? displays.find((candidate) => candidate.id !== primaryId) : displays[Number(wanted)];
+  if (!display) return {};
+  const offset = Number(process.env.RELAY_DEV_OFFSET ?? 0) || 0;
+  return { x: display.workArea.x + 40 + offset, y: display.workArea.y + 40 + offset };
+}
+
+/**
+ * Dev-only: optionally run a script in the page (its result is printed to
+ * stdout), then save a screenshot of the window and quit. Lets the UI be checked from a terminal without
  * clicking through it by hand.
  */
 function scheduleDevCapture(window: BrowserWindow, pngPath: string, script?: string) {
@@ -162,9 +184,14 @@ function scheduleDevCapture(window: BrowserWindow, pngPath: string, script?: str
     try {
       await new Promise((resolve) => setTimeout(resolve, 1200));
       if (script) {
-        await window.webContents.executeJavaScript(script, true);
+        const result: unknown = await window.webContents.executeJavaScript(script, true);
+        console.log("Dev script result:", result);
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
+      // Stay up a while after the script (e.g. a broadcaster waiting for a
+      // viewer started by the test harness), capturing at the end.
+      const keepOpenMs = Number(process.env.RELAY_DEV_KEEP_OPEN_MS ?? 0) || 0;
+      if (keepOpenMs > 0) await new Promise((resolve) => setTimeout(resolve, keepOpenMs));
       const image = await window.webContents.capturePage();
       fs.writeFileSync(pngPath, image.toPNG());
     } catch (error) {

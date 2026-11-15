@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useEffect, useRef, useState } from "react";
-import { generateCode } from "@relay/core";
 import { Button } from "../components/Button";
 import { CopyIcon } from "../components/icons";
 import { useI18n } from "../i18n/I18nContext";
+import { usePlatform } from "../platform/PlatformContext";
+import { useHostSession } from "../session/useHostSession";
 import type { StartedBroadcast } from "./SourcePicker";
 import screen from "./Screen.module.css";
 import styles from "./Live.module.css";
@@ -15,14 +16,17 @@ interface LiveProps {
   onStop: () => void;
   /** The captured source went away on its own (window closed). */
   onSourceEnded: () => void;
+  /** Start over with a fresh session (after the signaling server failed). */
+  onRetry: () => void;
 }
 
-export function Live({ broadcast, onStop, onSourceEnded }: LiveProps) {
+export function Live({ broadcast, onStop, onSourceEnded, onRetry }: LiveProps) {
   const { t } = useI18n();
+  const platform = usePlatform();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [code] = useState(() => generateCode());
+  const session = useHostSession(broadcast.stream);
   const [copied, setCopied] = useState(false);
-  const viewers = 0;
+  const live = session.status === "live" ? session : null;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -48,8 +52,9 @@ export function Live({ broadcast, onStop, onSourceEnded }: LiveProps) {
   }, [copied]);
 
   async function copyCode() {
+    if (!live) return;
     try {
-      await navigator.clipboard.writeText(code);
+      await platform.copyText(live.code);
       setCopied(true);
     } catch (error) {
       console.error("Failed to copy the code", error);
@@ -58,6 +63,20 @@ export function Live({ broadcast, onStop, onSourceEnded }: LiveProps) {
 
   return (
     <div className={screen.screen}>
+      {session.status === "failed" && (
+        <div className={screen.error} role="alert">
+          <p>{t.live.startFailed}</p>
+          <Button variant="secondary" onClick={onRetry} className={styles.retry}>
+            {t.live.retry}
+          </Button>
+        </div>
+      )}
+      {live && !live.signaling && (
+        <p className={screen.note} role="status">
+          {t.live.reconnecting}
+        </p>
+      )}
+
       <div className={styles.layout}>
         <section className={screen.panel} aria-labelledby="live-preview">
           <div className={screen.panelHead}>
@@ -78,12 +97,12 @@ export function Live({ broadcast, onStop, onSourceEnded }: LiveProps) {
             <h2 id="live-code" className="label">
               {t.live.codeLabel}
             </h2>
-            <div className={styles.visor}>
-              <output className={styles.code} aria-live="polite">
-                {code}
+            <div className={styles.visor} data-pending={!live}>
+              <output className={styles.code} aria-live="polite" aria-busy={!live}>
+                {live ? live.code : t.live.codePending}
               </output>
             </div>
-            <Button variant="secondary" onClick={() => void copyCode()}>
+            <Button variant="secondary" onClick={() => void copyCode()} disabled={!live}>
               <CopyIcon /> {copied ? t.live.copied : t.live.copy}
             </Button>
           </section>
@@ -94,11 +113,20 @@ export function Live({ broadcast, onStop, onSourceEnded }: LiveProps) {
                 {t.live.viewersLabel}
               </h2>
               <span className={styles.readout}>
-                <span className="lamp" data-lit={viewers > 0} />
-                <span className="tabularNums">{viewers}</span>
+                <span className="tabularNums">
+                  {live ? t.live.viewersOf(live.viewers.length, live.maxViewers) : "–"}
+                </span>
               </span>
             </div>
-            <p className={screen.description}>{t.live.connectionPending}</p>
+            {live && (
+              // One lamp per seat: lit seats are connected viewers.
+              <div className={styles.lamps} aria-hidden>
+                {Array.from({ length: live.maxViewers }, (_, index) => (
+                  <span key={index} className="lamp" data-lit={index < live.viewers.length} />
+                ))}
+              </div>
+            )}
+            {live && live.viewers.length === 0 && <p className={screen.description}>{t.live.noViewersYet}</p>}
           </section>
 
           <Button variant="danger" onClick={onStop} className={styles.stop}>

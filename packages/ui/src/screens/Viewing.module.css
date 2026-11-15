@@ -1,0 +1,28 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.connecting {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--visor-text);
+  font-size: var(--text-sm);
+}
+
+/* Keep the whole frame on screen: cap the player to the viewport height
+   minus header, panel chrome and the action bar. */
+.video {
+  max-height: calc(100dvh - 260px);
+  min-height: 180px;
+}

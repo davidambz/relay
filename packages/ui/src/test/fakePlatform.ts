@@ -12,6 +12,7 @@ export function fakePlatform(overrides: Partial<Platform> = {}): Platform {
     onSystemThemeChange: () => () => {},
     getSystemLocale: async () => "en",
     storage: { get: async () => undefined, set: async () => {} },
+    copyText: async () => {},
     ...overrides,
   };
 }

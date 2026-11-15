@@ -4,9 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./peerjs": "./src/session/peerjs.ts",
+    "./testing": "./src/session/testing/fakePeer.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.5"
   }
 }

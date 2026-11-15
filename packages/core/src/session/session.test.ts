@@ -1,0 +1,180 @@
+// Relay — Copyright (C) 2026 David Ambrozio
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import { DEFAULT_SESSION_CONFIG, type SessionConfig } from "./config";
+import { HostSession, HostSessionError } from "./host";
+import { enableOpusStereo } from "./sdp";
+import { FakeNetwork, type FakeMediaConnection } from "./testing/fakePeer";
+import { VIEWER_STREAM_TIMEOUT_MS, ViewerSession, type ViewerEndReason } from "./viewer";
+
+const stream = { id: "host-stream" } as unknown as MediaStream;
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const config = (overrides: Partial<SessionConfig> = {}): SessionConfig => ({ ...DEFAULT_SESSION_CONFIG, ...overrides });
+
+function codes(...values: string[]) {
+  let index = 0;
+  return () => values[index++] ?? "ZZZZZZ";
+}
+
+function watch(network: FakeNetwork, code: string) {
+  const result: { stream?: MediaStream; ended?: ViewerEndReason } = {};
+  const session = new ViewerSession(code, config(), network.factory, {
+    onStream: (received) => (result.stream = received),
+    onEnd: (reason) => (result.ended = reason),
+  });
+  session.connect();
+  return { session, result };
+}
+
+describe("HostSession", () => {
+  it("claims a code on the signaling server", async () => {
+    const network = new FakeNetwork();
+    const host = new HostSession(stream, config(), network.factory, {}, codes("ABC234"));
+    await expect(host.start()).resolves.toBe("ABC234");
+    expect(network.peers.has("relay-tenno-v1-ABC234")).toBe(true);
+    expect(host.code).toBe("ABC234");
+  });
+
+  it("retries with a new code when one is taken", async () => {
+    const network = new FakeNetwork();
+    network.occupy("relay-tenno-v1-AAAAAA");
+    const host = new HostSession(stream, config(), network.factory, {}, codes("AAAAAA", "BBBBBB"));
+    await expect(host.start()).resolves.toBe("BBBBBB");
+    expect(network.created[0].destroyed).toBe(true);
+  });
+
+  it("gives up after five taken codes", async () => {
+    const network = new FakeNetwork();
+    for (const code of ["AAAAAA", "BBBBBB", "CCCCCC", "DDDDDD", "EEEEEE"]) network.occupy(`relay-tenno-v1-${code}`);
+    const host = new HostSession(stream, config(), network.factory, {}, codes("AAAAAA", "BBBBBB", "CCCCCC", "DDDDDD", "EEEEEE"));
+    await expect(host.start()).rejects.toMatchObject({ type: "unavailable-id" });
+  });
+
+  it("rejects when the signaling server is unreachable", async () => {
+    const network = new FakeNetwork();
+    network.offline = true;
+    const host = new HostSession(stream, config(), network.factory);
+    await expect(host.start()).rejects.toBeInstanceOf(HostSessionError);
+  });
+
+  it("rejects start() if stopped while claiming a code", async () => {
+    const network = new FakeNetwork();
+    const host = new HostSession(stream, config(), network.factory);
+    const starting = host.start();
+    host.stop();
+    await expect(starting).rejects.toMatchObject({ type: "stopped" });
+  });
+});
+
+describe("host and viewer together", () => {
+  it("streams to a viewer and tracks the count", async () => {
+    const network = new FakeNetwork();
+    const viewerLists: string[][] = [];
+    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids) }, codes("ABC234"));
+    await host.start();
+
+    const { result } = watch(network, "ABC234");
+    await flush();
+    expect(result.stream).toBe(stream);
+    expect(viewerLists.at(-1)).toHaveLength(1);
+  });
+
+  it("applies Opus stereo on both the offer and the answer", async () => {
+    const network = new FakeNetwork();
+    const host = new HostSession(stream, config(), network.factory, {}, codes("ABC234"));
+    await host.start();
+    watch(network, "ABC234");
+    await flush();
+    const hostCall = network.peers.get("relay-tenno-v1-ABC234")!.calls[0];
+    expect(hostCall.sdpTransform).toBe(enableOpusStereo);
+    expect((hostCall.remote as FakeMediaConnection).sdpTransform).toBe(enableOpusStereo);
+  });
+
+  it("steps the bitrate down as viewers join", async () => {
+    const network = new FakeNetwork();
+    const host = new HostSession(stream, config(), network.factory, {}, codes("ABC234"));
+    await host.start();
+    for (let i = 0; i < 3; i++) watch(network, "ABC234");
+    await flush();
+    const firstCall = network.peers.get("relay-tenno-v1-ABC234")!.calls[0];
+    expect(firstCall.sender.applied).toEqual([6_000_000, 6_000_000, 4_000_000]);
+  });
+
+  it("turns away viewers past the limit", async () => {
+    const network = new FakeNetwork();
+    const viewerLists: string[][] = [];
+    const host = new HostSession(stream, config({ maxViewers: 1 }), network.factory, { onViewersChange: (ids) => viewerLists.push(ids) }, codes("ABC234"));
+    await host.start();
+    const first = watch(network, "ABC234");
+    await flush();
+    const second = watch(network, "ABC234");
+    await flush();
+    expect(second.result.ended).toBe("full");
+    expect(second.result.stream).toBeUndefined();
+    expect(first.result.ended).toBeUndefined();
+    expect(viewerLists.at(-1)).toHaveLength(1);
+  });
+
+  it("drops a viewer from the count when they leave", async () => {
+    const network = new FakeNetwork();
+    const viewerLists: string[][] = [];
+    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids) }, codes("ABC234"));
+    await host.start();
+    const { session } = watch(network, "ABC234");
+    await flush();
+    session.leave();
+    await flush();
+    expect(viewerLists.at(-1)).toEqual([]);
+  });
+
+  it("ends every viewer when the host stops", async () => {
+    vi.useFakeTimers();
+    try {
+      const network = new FakeNetwork();
+      const host = new HostSession(stream, config(), network.factory, {}, codes("ABC234"));
+      const starting = host.start();
+      await vi.advanceTimersByTimeAsync(0);
+      await starting;
+      const { result } = watch(network, "ABC234");
+      await vi.advanceTimersByTimeAsync(0);
+      host.stop();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(result.ended).toBe("ended");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("ViewerSession", () => {
+  it("reports an unknown code as not found", async () => {
+    const network = new FakeNetwork();
+    const { result } = watch(network, "NXPE23");
+    await flush();
+    expect(result.ended).toBe("not-found");
+  });
+
+  it("times out when no stream arrives", async () => {
+    vi.useFakeTimers();
+    try {
+      const network = new FakeNetwork();
+      // A peer that accepts connections but never calls back.
+      network.occupy("relay-tenno-v1-QUXET2");
+      const { result } = watch(network, "QUXET2");
+      await vi.advanceTimersByTimeAsync(VIEWER_STREAM_TIMEOUT_MS - 1);
+      expect(result.ended).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(result.ended).toBe("timeout");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports an unreachable signaling server", async () => {
+    const network = new FakeNetwork();
+    network.offline = true;
+    const { result } = watch(network, "ABC234");
+    await flush();
+    expect(result.ended).toBe("network");
+  });
+});

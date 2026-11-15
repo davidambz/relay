@@ -62,3 +62,21 @@
 .stop {
   width: 100%;
 }
+
+.visor[data-pending="true"] .code {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  letter-spacing: normal;
+  margin-right: 0;
+  color: var(--color-text-tertiary);
+  text-shadow: none;
+}
+
+.lamps {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.retry {
+  margin-top: var(--space-3);
+}
