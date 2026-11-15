@@ -7,7 +7,9 @@ android {
         applicationId "com.davidambz.relay"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // CI passes its run number, so every APK installs over the last
+        // one as an update; local builds stay at 1.
+        versionCode((System.getenv("RELAY_VERSION_CODE") ?: "1").toInteger())
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
