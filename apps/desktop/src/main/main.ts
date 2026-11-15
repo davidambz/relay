@@ -95,6 +95,29 @@ function registerIpc() {
   });
 }
 
+// What the renderer legitimately asks Chromium for: fullscreen (the
+// player; "automatic-fullscreen" keeps it working when the request isn't
+// tied to a fresh gesture, as before these handlers existed), media
+// (display capture, routed to the handler below) and writing to the
+// clipboard. Electron grants every permission by default; everything
+// else is denied.
+const ALLOWED_PERMISSIONS = new Set([
+  "fullscreen",
+  "automatic-fullscreen",
+  "media",
+  "display-capture",
+  "clipboard-sanitized-write",
+]);
+
+function registerPermissionHandlers() {
+  const allowed = (permission: string) => ALLOWED_PERMISSIONS.has(permission);
+  session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => {
+    if (!allowed(permission)) console.warn("Denied permission request:", permission);
+    callback(allowed(permission));
+  });
+  session.defaultSession.setPermissionCheckHandler((_contents, permission) => allowed(permission));
+}
+
 function registerDisplayMediaHandler() {
   // getDisplayMedia() in the renderer lands here instead of Chromium's
   // own picker: we hand back whatever source our picker chose. Audio is
@@ -303,6 +326,7 @@ Menu.setApplicationMenu(null);
 
 app.whenReady().then(() => {
   registerIpc();
+  registerPermissionHandlers();
   registerDisplayMediaHandler();
   createWindow();
   scheduleUpdateChecks();

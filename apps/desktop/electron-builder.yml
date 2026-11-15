@@ -12,6 +12,15 @@ files:
   - dist-renderer/**
   - package.json
 asar: true
+# Electron fuses, flipped in the packaged Relay.exe. Relay never needs
+# Node-mode or debugger switches, and only ever loads its own app.asar,
+# checked against the hash baked into the exe at build time.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
+  enableEmbeddedAsarIntegrityValidation: true
 win:
   target: dir
   icon: build/icon.ico
