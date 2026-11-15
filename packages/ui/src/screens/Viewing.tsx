@@ -1,10 +1,13 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ViewerEndReason } from "@relay/core";
 import { useI18n } from "../i18n/I18nContext";
+import { FloatingPlayer } from "../player/FloatingPlayer";
 import { Player } from "../player/Player";
+import { useChildWindow } from "../player/useChildWindow";
+import { useVolume } from "../player/useVolume";
 import { useViewerSession } from "../session/useViewerSession";
 import styles from "./Viewing.module.css";
 
@@ -14,10 +17,19 @@ interface ViewingProps {
   onEnded: (reason: ViewerEndReason) => void;
 }
 
-/** Watching a broadcast: the session plus the full-bleed player. */
+/**
+ * Watching a broadcast: the session, the full-bleed player, and the
+ * mini-player window. Both players read one stream and one volume state;
+ * only the visible one is fed the stream.
+ */
 export function Viewing({ code, onLeave, onEnded }: ViewingProps) {
   const { t } = useI18n();
   const session = useViewerSession(code);
+  const audio = useVolume();
+  const [floating, setFloating] = useState(false);
+  const closeFloating = useCallback(() => setFloating(false), []);
+  const floatingContainer = useChildWindow(floating, closeFloating);
+  const stream = session.status === "playing" ? session.stream : null;
 
   useEffect(() => {
     if (session.status === "ended") onEnded(session.reason);
@@ -26,11 +38,22 @@ export function Viewing({ code, onLeave, onEnded }: ViewingProps) {
   return (
     <div className={styles.viewing}>
       <Player
-        stream={session.status === "playing" ? session.stream : null}
+        stream={floatingContainer ? null : stream}
         code={code}
-        placeholder={t.viewing.connecting(code)}
+        placeholder={floatingContainer ? undefined : t.viewing.connecting(code)}
+        audio={audio}
         onLeave={onLeave}
+        onFloatingWindow={() => setFloating(true)}
       />
+      {floatingContainer && (
+        <FloatingPlayer
+          container={floatingContainer}
+          stream={stream}
+          audio={audio}
+          onReturn={closeFloating}
+          onLeave={onLeave}
+        />
+      )}
     </div>
   );
 }
