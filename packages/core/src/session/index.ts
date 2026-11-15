@@ -5,6 +5,7 @@ export * from "./bitrate";
 export * from "./config";
 export * from "./host";
 export * from "./messages";
+export * from "./quality";
 export * from "./sdp";
 export * from "./viewer";
 export type * from "./peer";
