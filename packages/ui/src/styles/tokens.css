@@ -1,0 +1,216 @@
+/*
+  Design tokens: the single source of truth for color, spacing, radius
+  and type. Same "Instrument Panel" world and block structure as Umbra's
+  settings-ui (../umbra/settings-ui/src/styles/tokens.css), with Relay's
+  own accent: a teal "on air" signal lamp instead of Umbra's violet, so
+  the two apps never read as the same window side by side.
+
+  Theme resolution: the Platform adapter reports the OS theme and
+  useSystemTheme sets data-theme="dark"/"light" on <html>. Until then, or
+  in a plain browser, prefers-color-scheme is the fallback.
+*/
+
+:root {
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui,
+    -apple-system, Roboto, sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, "SF Mono", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 1.875rem;
+
+  /* Engraved panel-label voice (the .label utility in global.css). */
+  --label-size: var(--text-xs);
+  --label-weight: 700;
+  --label-tracking: 0.09em;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3.5rem;
+
+  /* Machined, not molded. radius-full only for LEDs and switch tracks. */
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 7px;
+  --radius-full: 999px;
+
+  /* Minimum touch target, so the same screens work on a phone. */
+  --touch-target: 44px;
+
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  /* The one authored motion signature: Toggle's rocker paddle only. */
+  --ease-settle: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ---- Dark (primary scene): blackened steel, one teal lamp. ---- */
+:root {
+  --color-bg: #111416;
+  --color-surface: #191d20;
+  --color-surface-raised: #202528;
+  --color-surface-sunken: #0b0d0f;
+  --color-border: #2e3438;
+  --color-border-strong: #434b50;
+  --color-bevel-light: rgba(255, 255, 255, 0.06);
+
+  --color-text: #eef2f3;
+  --color-text-secondary: #a0aaae;
+  --color-text-tertiary: #6d787d;
+
+  --color-accent: #3fd0c0;
+  --color-accent-hover: #63dccf;
+  --color-accent-active: #2fb3a5;
+  --color-accent-contrast: #04201d;
+  --color-accent-subtle: #10302d;
+  --color-accent-subtle-border: #23766d;
+
+  --color-danger: #ff7b8f;
+  --color-danger-subtle: #34161d;
+
+  --shadow-card: 0 1px 0 var(--color-bevel-light) inset, 0 1px 2px rgba(0, 0, 0, 0.4),
+    0 10px 24px -10px rgba(0, 0, 0, 0.65);
+  --shadow-raised: 0 1px 0 var(--color-bevel-light) inset, 0 4px 12px rgba(0, 0, 0, 0.45),
+    0 20px 44px -14px rgba(0, 0, 0, 0.7);
+  --shadow-glow: 0 0 0 1px rgba(63, 208, 192, 0.4), 0 0 22px -2px rgba(63, 208, 192, 0.5);
+  --shadow-inset: inset 0 1px 3px rgba(0, 0, 0, 0.55), inset 0 -1px 0 var(--color-bevel-light);
+
+  --monitor-bezel: #0c0f10;
+  --monitor-bezel-edge: #353c40;
+  --visor-bg: #071211;
+  --visor-text: #5fe3d4;
+
+  --overlay-scrim: rgba(4, 6, 7, 0.6);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    /* Daylight: brushed aluminum. Same teal hue, darkened so it clears
+       4.5:1 as text and 3:1 as a component edge on the light chassis. */
+    --color-bg: #e5e9ea;
+    --color-surface: #f3f6f6;
+    --color-surface-raised: #ffffff;
+    --color-surface-sunken: #d6dcde;
+    --color-border: #c4cdd0;
+    --color-border-strong: #a2aeb2;
+    --color-bevel-light: rgba(255, 255, 255, 0.75);
+
+    --color-text: #131a1c;
+    --color-text-secondary: #45535a;
+    --color-text-tertiary: #6b787d;
+
+    --color-accent: #0b7a70;
+    --color-accent-hover: #096a61;
+    --color-accent-active: #075a52;
+    --color-accent-contrast: #ffffff;
+    --color-accent-subtle: #dbf1ee;
+    --color-accent-subtle-border: #86c8c0;
+
+    --color-danger: #b8265a;
+    --color-danger-subtle: #fbe4ec;
+
+    --shadow-card: 0 1px 0 var(--color-bevel-light) inset, 0 1px 2px rgba(20, 36, 40, 0.06),
+      0 8px 20px -10px rgba(20, 36, 40, 0.18);
+    --shadow-raised: 0 1px 0 var(--color-bevel-light) inset, 0 4px 12px rgba(20, 36, 40, 0.1),
+      0 20px 40px -16px rgba(20, 36, 40, 0.22);
+    --shadow-glow: 0 0 0 1px rgba(11, 122, 112, 0.3), 0 0 18px -3px rgba(11, 122, 112, 0.35);
+    --shadow-inset: inset 0 1px 3px rgba(20, 36, 40, 0.12), inset 0 -1px 0 var(--color-bevel-light);
+
+    --monitor-bezel: #1a2427;
+    --monitor-bezel-edge: #3a4a4f;
+    /* The share-code visor stays a dark, lit display in both themes, the
+       way an equipment readout doesn't turn white in daylight. */
+    --visor-bg: #0b1716;
+    --visor-text: #5fe3d4;
+
+    --overlay-scrim: rgba(19, 26, 28, 0.4);
+  }
+}
+
+/* An explicit theme from the platform always wins over the media query. */
+:root[data-theme="dark"] {
+  --color-bg: #111416;
+  --color-surface: #191d20;
+  --color-surface-raised: #202528;
+  --color-surface-sunken: #0b0d0f;
+  --color-border: #2e3438;
+  --color-border-strong: #434b50;
+  --color-bevel-light: rgba(255, 255, 255, 0.06);
+
+  --color-text: #eef2f3;
+  --color-text-secondary: #a0aaae;
+  --color-text-tertiary: #6d787d;
+
+  --color-accent: #3fd0c0;
+  --color-accent-hover: #63dccf;
+  --color-accent-active: #2fb3a5;
+  --color-accent-contrast: #04201d;
+  --color-accent-subtle: #10302d;
+  --color-accent-subtle-border: #23766d;
+
+  --color-danger: #ff7b8f;
+  --color-danger-subtle: #34161d;
+
+  --shadow-card: 0 1px 0 var(--color-bevel-light) inset, 0 1px 2px rgba(0, 0, 0, 0.4),
+    0 10px 24px -10px rgba(0, 0, 0, 0.65);
+  --shadow-raised: 0 1px 0 var(--color-bevel-light) inset, 0 4px 12px rgba(0, 0, 0, 0.45),
+    0 20px 44px -14px rgba(0, 0, 0, 0.7);
+  --shadow-glow: 0 0 0 1px rgba(63, 208, 192, 0.4), 0 0 22px -2px rgba(63, 208, 192, 0.5);
+  --shadow-inset: inset 0 1px 3px rgba(0, 0, 0, 0.55), inset 0 -1px 0 var(--color-bevel-light);
+
+  --monitor-bezel: #0c0f10;
+  --monitor-bezel-edge: #353c40;
+  --visor-bg: #071211;
+  --visor-text: #5fe3d4;
+
+  --overlay-scrim: rgba(4, 6, 7, 0.6);
+}
+
+:root[data-theme="light"] {
+  --color-bg: #e5e9ea;
+  --color-surface: #f3f6f6;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #d6dcde;
+  --color-border: #c4cdd0;
+  --color-border-strong: #a2aeb2;
+  --color-bevel-light: rgba(255, 255, 255, 0.75);
+
+  --color-text: #131a1c;
+  --color-text-secondary: #45535a;
+  --color-text-tertiary: #6b787d;
+
+  --color-accent: #0b7a70;
+  --color-accent-hover: #096a61;
+  --color-accent-active: #075a52;
+  --color-accent-contrast: #ffffff;
+  --color-accent-subtle: #dbf1ee;
+  --color-accent-subtle-border: #86c8c0;
+
+  --color-danger: #b8265a;
+  --color-danger-subtle: #fbe4ec;
+
+  --shadow-card: 0 1px 0 var(--color-bevel-light) inset, 0 1px 2px rgba(20, 36, 40, 0.06),
+    0 8px 20px -10px rgba(20, 36, 40, 0.18);
+  --shadow-raised: 0 1px 0 var(--color-bevel-light) inset, 0 4px 12px rgba(20, 36, 40, 0.1),
+    0 20px 40px -16px rgba(20, 36, 40, 0.22);
+  --shadow-glow: 0 0 0 1px rgba(11, 122, 112, 0.3), 0 0 18px -3px rgba(11, 122, 112, 0.35);
+  --shadow-inset: inset 0 1px 3px rgba(20, 36, 40, 0.12), inset 0 -1px 0 var(--color-bevel-light);
+
+  --monitor-bezel: #1a2427;
+  --monitor-bezel-edge: #3a4a4f;
+  /* The share-code visor stays a dark, lit display in both themes, the
+     way an equipment readout doesn't turn white in daylight. */
+  --visor-bg: #0b1716;
+  --visor-text: #5fe3d4;
+
+  --overlay-scrim: rgba(19, 26, 28, 0.4);
+}
