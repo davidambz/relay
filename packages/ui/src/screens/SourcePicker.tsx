@@ -2,9 +2,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { videoProfileFor, type CaptureSource, type CaptureSourceKind, type ContentHint } from "@relay/core";
+import {
+  applyQualityToTrack,
+  videoProfileFor,
+  type CaptureSource,
+  type CaptureSourceKind,
+  type StreamQuality,
+} from "@relay/core";
 import { Button } from "../components/Button";
+import { QualityPicker } from "../components/QualityPicker";
 import { Segmented } from "../components/Segmented";
+import { useStreamQuality } from "../hooks/useStreamQuality";
 import { BackIcon, RefreshIcon } from "../components/icons";
 import { useI18n } from "../i18n/I18nContext";
 import { usePlatform } from "../platform/PlatformContext";
@@ -15,7 +23,7 @@ import styles from "./SourcePicker.module.css";
 export interface StartedBroadcast {
   stream: MediaStream;
   sourceName: string;
-  contentHint: ContentHint;
+  quality: StreamQuality;
 }
 
 interface SourcePickerProps {
@@ -32,7 +40,7 @@ export function SourcePicker({ notice, onBack, onStarted }: SourcePickerProps) {
   const [kind, setKind] = useState<CaptureSourceKind>("screen");
   const [load, setLoad] = useState<LoadState>({ status: "loading" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [contentHint, setContentHint] = useState<ContentHint>("detail");
+  const [quality, setQuality] = useStreamQuality();
   const [starting, setStarting] = useState(false);
   const [captureError, setCaptureError] = useState(false);
 
@@ -78,9 +86,14 @@ export function SourcePicker({ notice, onBack, onStarted }: SourcePickerProps) {
     setStarting(true);
     setCaptureError(false);
     try {
-      const { frameRate } = videoProfileFor(contentHint);
-      const stream = await platform.captureSource(selected.id, { contentHint, frameRate });
-      onStarted({ stream, sourceName: selected.name, contentHint });
+      const { contentHint } = videoProfileFor(quality);
+      const stream = await platform.captureSource(selected.id, { contentHint });
+      const [track] = stream.getVideoTracks();
+      if (track) {
+        // A failed constraint (odd source) still leaves a working stream.
+        await applyQualityToTrack(track, quality).catch((error) => console.warn("Couldn't apply quality", error));
+      }
+      onStarted({ stream, sourceName: selected.name, quality });
     } catch (error) {
       console.error("Failed to capture source", error);
       setCaptureError(true);
@@ -173,15 +186,7 @@ export function SourcePicker({ notice, onBack, onStarted }: SourcePickerProps) {
         <h2 id="picker-quality" className="label">
           {t.picker.qualityLabel}
         </h2>
-        <Segmented
-          label={t.picker.qualityLabel}
-          value={contentHint}
-          onChange={setContentHint}
-          options={[
-            { value: "detail", label: t.picker.qualityDetail, hint: t.picker.qualityDetailHint },
-            { value: "motion", label: t.picker.qualityMotion, hint: t.picker.qualityMotionHint },
-          ]}
-        />
+        <QualityPicker value={quality} onChange={setQuality} />
       </section>
 
       {captureError && (

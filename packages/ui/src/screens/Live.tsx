@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useEffect, useRef, useState } from "react";
+import { applyQualityToTrack, videoProfileFor, type StreamQuality } from "@relay/core";
 import { Button } from "../components/Button";
 import { CopyIcon } from "../components/icons";
+import { QualityPicker } from "../components/QualityPicker";
 import { useI18n } from "../i18n/I18nContext";
 import { usePlatform } from "../platform/PlatformContext";
 import { useHostSession } from "../session/useHostSession";
@@ -18,13 +20,22 @@ interface LiveProps {
   onSourceEnded: () => void;
   /** Start over with a fresh session (after the signaling server failed). */
   onRetry: () => void;
+  /** Remember a quality change made mid-broadcast. */
+  onQualityChange: (quality: StreamQuality) => void;
 }
 
-export function Live({ broadcast, onStop, onSourceEnded, onRetry }: LiveProps) {
+function encoderSettingsFor(quality: StreamQuality) {
+  const { degradationPreference, bitrateScale } = videoProfileFor(quality);
+  return { degradationPreference, bitrateScale };
+}
+
+export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChange }: LiveProps) {
   const { t } = useI18n();
   const platform = usePlatform();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const session = useHostSession(broadcast.stream, broadcast.contentHint);
+  const [quality, setQuality] = useState<StreamQuality>(broadcast.quality);
+  const [qualityError, setQualityError] = useState(false);
+  const [session, setEncoderSettings] = useHostSession(broadcast.stream, encoderSettingsFor(broadcast.quality));
   const [copied, setCopied] = useState(false);
   const live = session.status === "live" ? session : null;
 
@@ -50,6 +61,21 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry }: LiveProps) {
     const timer = window.setTimeout(() => setCopied(false), 1600);
     return () => window.clearTimeout(timer);
   }, [copied]);
+
+  async function changeQuality(next: StreamQuality) {
+    setQuality(next);
+    setQualityError(false);
+    onQualityChange(next);
+    setEncoderSettings(encoderSettingsFor(next));
+    const [track] = broadcast.stream.getVideoTracks();
+    if (!track) return;
+    try {
+      await applyQualityToTrack(track, next);
+    } catch (error) {
+      console.warn("Couldn't apply quality", error);
+      setQualityError(true);
+    }
+  }
 
   async function copyCode() {
     if (!live) return;
@@ -127,6 +153,18 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry }: LiveProps) {
               </div>
             )}
             {live && live.viewers.length === 0 && <p className={screen.description}>{t.live.noViewersYet}</p>}
+          </section>
+
+          <section className={screen.panel} aria-labelledby="live-quality">
+            <h2 id="live-quality" className="label">
+              {t.live.qualityLabel}
+            </h2>
+            <QualityPicker value={quality} onChange={(next) => void changeQuality(next)} />
+            {qualityError && (
+              <p className={screen.error} role="alert">
+                {t.quality.applyFailed}
+              </p>
+            )}
           </section>
 
           <Button variant="danger" onClick={onStop} className={styles.stop}>

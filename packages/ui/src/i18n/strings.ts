@@ -27,14 +27,18 @@ export interface Strings {
     loadFailed: string;
     monitorName: (index: number) => string;
     qualityLabel: string;
-    qualityDetail: string;
-    qualityDetailHint: string;
-    qualityMotion: string;
-    qualityMotionHint: string;
     back: string;
     start: string;
     starting: string;
     captureFailed: string;
+  };
+  quality: {
+    resolutionLabel: string;
+    fpsLabel: string;
+    native: string;
+    fps60Hint: string;
+    fps30Hint: string;
+    applyFailed: string;
   };
   live: {
     previewLabel: string;
@@ -43,6 +47,7 @@ export interface Strings {
     copied: string;
     viewersLabel: string;
     sourceLabel: string;
+    qualityLabel: string;
     stop: string;
     codePending: string;
     startFailed: string;

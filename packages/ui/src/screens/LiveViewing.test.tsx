@@ -24,7 +24,13 @@ describe("broadcasting and watching", () => {
     const network = new FakeNetwork();
     const host = renderWith(
       network,
-      <Live broadcast={{ stream: fakeStream, sourceName: "Monitor 1", contentHint: "detail" }} onStop={() => {}} onSourceEnded={() => {}} onRetry={() => {}} />,
+      <Live
+        broadcast={{ stream: fakeStream, sourceName: "Monitor 1", quality: { resolution: "native", fps: 60 } }}
+        onStop={() => {}}
+        onSourceEnded={() => {}}
+        onRetry={() => {}}
+        onQualityChange={() => {}}
+      />,
     );
     const code = await within(host.container).findByText(/^[A-Z2-9]{6}$/);
     expect(within(host.container).getByText("0 of 5")).toBeInTheDocument();

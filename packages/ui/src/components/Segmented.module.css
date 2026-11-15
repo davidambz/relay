@@ -10,7 +10,7 @@
 }
 
 .cell {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: var(--touch-target);
   display: inline-flex;

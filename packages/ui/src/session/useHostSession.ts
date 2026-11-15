@@ -1,8 +1,8 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useEffect, useState } from "react";
-import { HostSession, loadSessionConfig, videoProfileFor, type ContentHint } from "@relay/core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { HostSession, loadSessionConfig, type EncoderSettings } from "@relay/core";
 import { usePlatform } from "../platform/PlatformContext";
 import { usePeerFactory } from "./PeerFactoryContext";
 
@@ -15,10 +15,17 @@ export type HostState =
  * Runs a HostSession for as long as the component is mounted with this
  * stream. To retry after a failure, remount (change the component key).
  */
-export function useHostSession(stream: MediaStream, contentHint: ContentHint): HostState {
+export function useHostSession(
+  stream: MediaStream,
+  encoder: EncoderSettings,
+): [HostState, (settings: EncoderSettings) => void] {
   const platform = usePlatform();
   const createPeer = usePeerFactory();
   const [state, setState] = useState<HostState>({ status: "starting" });
+  const sessionRef = useRef<HostSession | null>(null);
+  // Encoder settings at the time the session starts; later changes go
+  // through setEncoderSettings so they don't restart the broadcast.
+  const initialEncoder = useRef(encoder);
 
   useEffect(() => {
     let disposed = false;
@@ -31,7 +38,7 @@ export function useHostSession(stream: MediaStream, contentHint: ContentHint): H
       const config = await loadSessionConfig(platform.storage);
       if (disposed) return;
       session = new HostSession(stream, config, createPeer, {
-        degradationPreference: videoProfileFor(contentHint).degradationPreference,
+        ...initialEncoder.current,
         onViewersChange: (viewers) =>
           update((current) => (current.status === "live" ? { ...current, viewers } : current)),
         onSignalingChange: (signaling) =>
@@ -40,6 +47,7 @@ export function useHostSession(stream: MediaStream, contentHint: ContentHint): H
       // Diagnostics handle (encoder stats per viewer), e.g. from DevTools:
       // await relayDiagnostics.hostVideoStats()
       const current = session;
+      sessionRef.current = session;
       (globalThis as { relayDiagnostics?: object }).relayDiagnostics = {
         hostVideoStats: () => current.getVideoStats(),
       };
@@ -55,9 +63,15 @@ export function useHostSession(stream: MediaStream, contentHint: ContentHint): H
 
     return () => {
       disposed = true;
+      sessionRef.current = null;
       session?.stop();
     };
-  }, [stream, contentHint, platform, createPeer]);
+  }, [stream, platform, createPeer]);
 
-  return state;
+  const setEncoderSettings = useCallback((settings: EncoderSettings) => {
+    initialEncoder.current = { ...initialEncoder.current, ...settings };
+    sessionRef.current?.setEncoderSettings(settings);
+  }, []);
+
+  return [state, setEncoderSettings];
 }

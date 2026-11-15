@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { Header } from "./components/Header";
 import { useI18n } from "./i18n/I18nContext";
 import { useSystemTheme } from "./hooks/useSystemTheme";
+import { useStreamQuality } from "./hooks/useStreamQuality";
 import { Home } from "./screens/Home";
 import { Live } from "./screens/Live";
 import { SourcePicker, type StartedBroadcast } from "./screens/SourcePicker";
@@ -28,6 +29,7 @@ export function App() {
   useSystemTheme();
   const { t } = useI18n();
   const [route, setRoute] = useState<Route>({ screen: "home" });
+  const [, rememberQuality] = useStreamQuality();
 
   const handleSourceEnded = useCallback(() => {
     setRoute((current) => {
@@ -76,6 +78,7 @@ export function App() {
             }}
             onSourceEnded={handleSourceEnded}
             onRetry={() => setRoute({ ...route, attempt: route.attempt + 1 })}
+            onQualityChange={rememberQuality}
           />
         )}
         {route.screen === "watch" && (
