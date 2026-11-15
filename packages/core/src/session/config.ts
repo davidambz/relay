@@ -9,6 +9,11 @@ export interface SessionConfig {
   /** Custom PeerJS signaling server; undefined uses the free PeerJS cloud. */
   server?: PeerServerOptions;
   maxViewers: number;
+  /**
+   * Video codec to put first in negotiation (e.g. "H264"), or undefined
+   * for the browser's default order.
+   */
+  preferredVideoCodec?: string;
 }
 
 export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
@@ -19,6 +24,11 @@ export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   iceServers: DEFAULT_ICE_SERVERS,
   maxViewers: 5,
+  // Measured on Windows with an NVIDIA GPU while gaming, Smoothness mode:
+  // Chromium's default VP8 ran in software (libvpx) at 13 fps; H.264 used
+  // the hardware encoder (Media Foundation / NVENC) at 29 fps. Peers
+  // without H.264 still negotiate whatever they share; this only orders.
+  preferredVideoCodec: "H264",
 };
 
 export const SESSION_CONFIG_KEY = "session";
@@ -43,6 +53,9 @@ export async function loadSessionConfig(storage: KeyValueStore): Promise<Session
     if (Number.isInteger(stored.maxViewers) && (stored.maxViewers as number) > 0) {
       config.maxViewers = stored.maxViewers as number;
     }
+    if (typeof stored.preferredVideoCodec === "string") config.preferredVideoCodec = stored.preferredVideoCodec;
+    // An explicit null in storage means "browser default", overriding ours.
+    if ((stored as { preferredVideoCodec?: unknown }).preferredVideoCodec === null) delete config.preferredVideoCodec;
   }
   return config;
 }

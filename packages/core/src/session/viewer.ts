@@ -5,7 +5,7 @@ import { peerIdForCode } from "../code";
 import type { SessionConfig } from "./config";
 import { isHostMessage } from "./messages";
 import type { DataConnectionLike, MediaConnectionLike, PeerError, PeerFactory, PeerLike } from "./peer";
-import { enableOpusStereo } from "./sdp";
+import { sessionSdpTransform } from "./sdp";
 
 /** No stream this long after connecting usually means NAT/firewall trouble. */
 export const VIEWER_STREAM_TIMEOUT_MS = 20_000;
@@ -84,7 +84,7 @@ export class ViewerSession {
       call.close();
       return;
     }
-    call.answer(undefined, { sdpTransform: enableOpusStereo });
+    call.answer(undefined, { sdpTransform: sessionSdpTransform(this.config.preferredVideoCodec) });
     call.on("stream", (stream: MediaStream) => {
       if (this.ended) return;
       if (this.timeout) clearTimeout(this.timeout);
