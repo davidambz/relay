@@ -13,6 +13,8 @@ import { Button } from "../components/Button";
 import { QualityPicker } from "../components/QualityPicker";
 import { Segmented } from "../components/Segmented";
 import { useStreamQuality } from "../hooks/useStreamQuality";
+import { useBroadcastAudio } from "../hooks/useBroadcastAudio";
+import { Toggle } from "../components/Toggle";
 import { BackIcon, RefreshIcon } from "../components/icons";
 import { useI18n } from "../i18n/I18nContext";
 import { usePlatform } from "../platform/PlatformContext";
@@ -41,6 +43,8 @@ export function SourcePicker({ notice, onBack, onStarted }: SourcePickerProps) {
   const [load, setLoad] = useState<LoadState>({ status: "loading" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [quality, setQuality] = useStreamQuality();
+  const [audio, setAudio] = useBroadcastAudio();
+  const canSendAudio = platform.capabilities.systemAudio;
   const [starting, setStarting] = useState(false);
   const [captureError, setCaptureError] = useState(false);
 
@@ -87,7 +91,7 @@ export function SourcePicker({ notice, onBack, onStarted }: SourcePickerProps) {
     setCaptureError(false);
     try {
       const { contentHint } = videoProfileFor(quality);
-      const stream = await platform.captureSource(selected.id, { contentHint });
+      const stream = await platform.captureSource(selected.id, { contentHint, audio: canSendAudio && audio });
       const [track] = stream.getVideoTracks();
       if (track) {
         // A failed constraint (odd source) still leaves a working stream.
@@ -187,6 +191,14 @@ export function SourcePicker({ notice, onBack, onStarted }: SourcePickerProps) {
           {t.picker.qualityLabel}
         </h2>
         <QualityPicker value={quality} onChange={setQuality} />
+        {canSendAudio && (
+          <Toggle
+            label={t.quality.audioLabel}
+            description={t.quality.audioDescription}
+            checked={audio}
+            onChange={setAudio}
+          />
+        )}
       </section>
 
       {captureError && (

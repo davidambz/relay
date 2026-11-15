@@ -6,6 +6,7 @@ import { applyQualityToTrack, videoProfileFor, type StreamQuality } from "@relay
 import { Button } from "../components/Button";
 import { CopyIcon } from "../components/icons";
 import { QualityPicker } from "../components/QualityPicker";
+import { Toggle } from "../components/Toggle";
 import { useI18n } from "../i18n/I18nContext";
 import { usePlatform } from "../platform/PlatformContext";
 import { useHostSession } from "../session/useHostSession";
@@ -35,6 +36,15 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChang
   const videoRef = useRef<HTMLVideoElement>(null);
   const [quality, setQuality] = useState<StreamQuality>(broadcast.quality);
   const [qualityError, setQualityError] = useState(false);
+  const hasAudio = broadcast.stream.getAudioTracks().length > 0;
+  const [audioOn, setAudioOn] = useState(hasAudio);
+
+  // Muting mid-broadcast disables the track (viewers get silence) rather
+  // than removing it, so nothing renegotiates and unmuting is instant.
+  function toggleAudio(next: boolean) {
+    for (const track of broadcast.stream.getAudioTracks()) track.enabled = next;
+    setAudioOn(next);
+  }
   const [session, setEncoderSettings] = useHostSession(broadcast.stream, encoderSettingsFor(broadcast.quality));
   const [copied, setCopied] = useState(false);
   const live = session.status === "live" ? session : null;
@@ -160,6 +170,7 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChang
               {t.live.qualityLabel}
             </h2>
             <QualityPicker value={quality} onChange={(next) => void changeQuality(next)} />
+            {hasAudio && <Toggle label={t.quality.audioLabel} checked={audioOn} onChange={toggleAudio} />}
             {qualityError && (
               <p className={screen.error} role="alert">
                 {t.quality.applyFailed}

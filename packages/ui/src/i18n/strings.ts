@@ -39,6 +39,8 @@ export interface Strings {
     fps60Hint: string;
     fps30Hint: string;
     applyFailed: string;
+    audioLabel: string;
+    audioDescription: string;
   };
   live: {
     previewLabel: string;

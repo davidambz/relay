@@ -9,7 +9,7 @@ import { fakePlatform } from "../test/fakePlatform";
 import { Live } from "./Live";
 import { Viewing } from "./Viewing";
 
-const fakeStream = { getVideoTracks: () => [], getTracks: () => [] } as unknown as MediaStream;
+const fakeStream = { getVideoTracks: () => [], getAudioTracks: () => [], getTracks: () => [] } as unknown as MediaStream;
 
 function renderWith(network: FakeNetwork, ui: React.ReactElement) {
   return render(

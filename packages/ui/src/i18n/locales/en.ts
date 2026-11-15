@@ -41,6 +41,8 @@ export const en: Strings = {
     fps60Hint: "Games and video",
     fps30Hint: "Text and code",
     applyFailed: "Couldn't apply that quality to this source.",
+    audioLabel: "Send sound",
+    audioDescription: "A window sends only its app's sound. A monitor sends everything except Discord.",
   },
   live: {
     previewLabel: "Preview",

@@ -59,11 +59,37 @@ describe("SourcePicker", () => {
     await user.click(screen.getByRole("radio", { name: "720p" }));
     await user.click(screen.getByRole("radio", { name: /30 FPS/ }));
     await user.click(screen.getByRole("button", { name: "Start broadcast" }));
-    expect(captureSource).toHaveBeenCalledWith("screen:2:0", { contentHint: "detail" });
+    expect(captureSource).toHaveBeenCalledWith("screen:2:0", { contentHint: "detail", audio: false });
     expect(applied).toHaveBeenCalledWith(expect.objectContaining({ frameRate: { ideal: 30, max: 30 }, height: { max: 720 } }));
     expect(onStarted).toHaveBeenCalledWith(
       expect.objectContaining({ sourceName: "Monitor 2", quality: { resolution: "720", fps: 30 } }),
     );
+  });
+
+  it("asks for system audio when the platform has it and the switch is on", async () => {
+    const user = userEvent.setup();
+    const captureSource = vi.fn(async () => fakeStream());
+    const platform = fakePlatform({
+      listSources: async () => SOURCES,
+      captureSource,
+      capabilities: { host: true, systemAudio: true, floating: "window", selfUpdate: false },
+    });
+    render(
+      <PlatformContext.Provider value={platform}>
+        <SourcePicker onBack={() => {}} onStarted={() => {}} />
+      </PlatformContext.Provider>,
+    );
+    await user.click(await screen.findByRole("radio", { name: "Monitor 1" }));
+    const audioSwitch = screen.getByRole("switch", { name: /Send sound/ });
+    expect(audioSwitch).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Start broadcast" }));
+    expect(captureSource).toHaveBeenLastCalledWith("screen:1:0", expect.objectContaining({ audio: true }));
+  });
+
+  it("hides the sound switch where the platform can't send audio", async () => {
+    renderPicker();
+    await screen.findByRole("radio", { name: "Monitor 1" });
+    expect(screen.queryByRole("switch", { name: /Send sound/ })).not.toBeInTheDocument();
   });
 
   it("shows an error and stays put when capture fails", async () => {
