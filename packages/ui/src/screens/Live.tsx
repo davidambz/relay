@@ -24,7 +24,7 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry }: LiveProps) {
   const { t } = useI18n();
   const platform = usePlatform();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const session = useHostSession(broadcast.stream);
+  const session = useHostSession(broadcast.stream, broadcast.contentHint);
   const [copied, setCopied] = useState(false);
   const live = session.status === "live" ? session : null;
 

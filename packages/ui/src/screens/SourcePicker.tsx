@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CaptureSource, CaptureSourceKind, ContentHint } from "@relay/core";
+import { videoProfileFor, type CaptureSource, type CaptureSourceKind, type ContentHint } from "@relay/core";
 import { Button } from "../components/Button";
 import { Segmented } from "../components/Segmented";
 import { BackIcon, RefreshIcon } from "../components/icons";
@@ -78,7 +78,8 @@ export function SourcePicker({ notice, onBack, onStarted }: SourcePickerProps) {
     setStarting(true);
     setCaptureError(false);
     try {
-      const stream = await platform.captureSource(selected.id, { contentHint });
+      const { frameRate } = videoProfileFor(contentHint);
+      const stream = await platform.captureSource(selected.id, { contentHint, frameRate });
       onStarted({ stream, sourceName: selected.name, contentHint });
     } catch (error) {
       console.error("Failed to capture source", error);

@@ -54,7 +54,7 @@ describe("SourcePicker", () => {
     await user.click(await screen.findByRole("radio", { name: "Monitor 2" }));
     await user.click(screen.getByRole("radio", { name: /Smoothness/ }));
     await user.click(screen.getByRole("button", { name: "Start broadcast" }));
-    expect(captureSource).toHaveBeenCalledWith("screen:2:0", { contentHint: "motion" });
+    expect(captureSource).toHaveBeenCalledWith("screen:2:0", { contentHint: "motion", frameRate: { ideal: 60, max: 60 } });
     expect(onStarted).toHaveBeenCalledWith(expect.objectContaining({ sourceName: "Monitor 2", contentHint: "motion" }));
   });
 

@@ -29,7 +29,7 @@ function watch(network: FakeNetwork, code: string) {
 describe("HostSession", () => {
   it("claims a code on the signaling server", async () => {
     const network = new FakeNetwork();
-    const host = new HostSession(stream, config(), network.factory, {}, codes("ABC234"));
+    const host = new HostSession(stream, config(), network.factory, { makeCode: codes("ABC234") });
     await expect(host.start()).resolves.toBe("ABC234");
     expect(network.peers.has("relay-tenno-v1-ABC234")).toBe(true);
     expect(host.code).toBe("ABC234");
@@ -38,7 +38,7 @@ describe("HostSession", () => {
   it("retries with a new code when one is taken", async () => {
     const network = new FakeNetwork();
     network.occupy("relay-tenno-v1-AAAAAA");
-    const host = new HostSession(stream, config(), network.factory, {}, codes("AAAAAA", "BBBBBB"));
+    const host = new HostSession(stream, config(), network.factory, { makeCode: codes("AAAAAA", "BBBBBB") });
     await expect(host.start()).resolves.toBe("BBBBBB");
     expect(network.created[0].destroyed).toBe(true);
   });
@@ -46,7 +46,7 @@ describe("HostSession", () => {
   it("gives up after five taken codes", async () => {
     const network = new FakeNetwork();
     for (const code of ["AAAAAA", "BBBBBB", "CCCCCC", "DDDDDD", "EEEEEE"]) network.occupy(`relay-tenno-v1-${code}`);
-    const host = new HostSession(stream, config(), network.factory, {}, codes("AAAAAA", "BBBBBB", "CCCCCC", "DDDDDD", "EEEEEE"));
+    const host = new HostSession(stream, config(), network.factory, { makeCode: codes("AAAAAA", "BBBBBB", "CCCCCC", "DDDDDD", "EEEEEE") });
     await expect(host.start()).rejects.toMatchObject({ type: "unavailable-id" });
   });
 
@@ -70,7 +70,7 @@ describe("host and viewer together", () => {
   it("streams to a viewer and tracks the count", async () => {
     const network = new FakeNetwork();
     const viewerLists: string[][] = [];
-    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids) }, codes("ABC234"));
+    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });
     await host.start();
 
     const { result } = watch(network, "ABC234");
@@ -81,29 +81,40 @@ describe("host and viewer together", () => {
 
   it("applies Opus stereo on both the offer and the answer", async () => {
     const network = new FakeNetwork();
-    const host = new HostSession(stream, config(), network.factory, {}, codes("ABC234"));
+    const host = new HostSession(stream, config(), network.factory, { makeCode: codes("ABC234") });
     await host.start();
     watch(network, "ABC234");
     await flush();
     const hostCall = network.peers.get("relay-tenno-v1-ABC234")!.calls[0];
-    expect(hostCall.sdpTransform).toBe(enableOpusStereo);
-    expect((hostCall.remote as FakeMediaConnection).sdpTransform).toBe(enableOpusStereo);
+    const opus = "a=rtpmap:111 opus/48000/2\na=fmtp:111 minptime=10\n";
+    expect(hostCall.sdpTransform!(opus)).toBe(enableOpusStereo(opus));
+    expect((hostCall.remote as FakeMediaConnection).sdpTransform!(opus)).toBe(enableOpusStereo(opus));
+  });
+
+  it("applies the quality mode's degradation preference", async () => {
+    const network = new FakeNetwork();
+    const host = new HostSession(stream, config(), network.factory, { makeCode: codes("ABC234"), degradationPreference: "maintain-framerate" });
+    await host.start();
+    watch(network, "ABC234");
+    await flush();
+    const sender = network.peers.get("relay-tenno-v1-ABC234")!.calls[0].sender;
+    expect(sender.degradation).toEqual(["maintain-framerate"]);
   });
 
   it("steps the bitrate down as viewers join", async () => {
     const network = new FakeNetwork();
-    const host = new HostSession(stream, config(), network.factory, {}, codes("ABC234"));
+    const host = new HostSession(stream, config(), network.factory, { makeCode: codes("ABC234") });
     await host.start();
     for (let i = 0; i < 3; i++) watch(network, "ABC234");
     await flush();
     const firstCall = network.peers.get("relay-tenno-v1-ABC234")!.calls[0];
-    expect(firstCall.sender.applied).toEqual([6_000_000, 6_000_000, 4_000_000]);
+    expect(firstCall.sender.applied).toEqual([12_000_000, 12_000_000, 10_000_000]);
   });
 
   it("turns away viewers past the limit", async () => {
     const network = new FakeNetwork();
     const viewerLists: string[][] = [];
-    const host = new HostSession(stream, config({ maxViewers: 1 }), network.factory, { onViewersChange: (ids) => viewerLists.push(ids) }, codes("ABC234"));
+    const host = new HostSession(stream, config({ maxViewers: 1 }), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });
     await host.start();
     const first = watch(network, "ABC234");
     await flush();
@@ -118,7 +129,7 @@ describe("host and viewer together", () => {
   it("drops a viewer from the count when they leave", async () => {
     const network = new FakeNetwork();
     const viewerLists: string[][] = [];
-    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids) }, codes("ABC234"));
+    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });
     await host.start();
     const { session } = watch(network, "ABC234");
     await flush();
@@ -131,7 +142,7 @@ describe("host and viewer together", () => {
     vi.useFakeTimers();
     try {
       const network = new FakeNetwork();
-      const host = new HostSession(stream, config(), network.factory, {}, codes("ABC234"));
+      const host = new HostSession(stream, config(), network.factory, { makeCode: codes("ABC234") });
       const starting = host.start();
       await vi.advanceTimersByTimeAsync(0);
       await starting;

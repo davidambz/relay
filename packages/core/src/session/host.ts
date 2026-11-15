@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { generateCode, peerIdForCode } from "../code";
-import { applyMaxBitrate, maxBitrateForViewers } from "./bitrate";
+import { applySenderSettings, maxBitrateForViewers } from "./bitrate";
 import type { SessionConfig } from "./config";
 import type { HostMessage } from "./messages";
 import type { DataConnectionLike, MediaConnectionLike, PeerError, PeerFactory, PeerLike } from "./peer";
-import { enableOpusStereo } from "./sdp";
+import { sessionSdpTransform } from "./sdp";
 
 const MAX_CODE_ATTEMPTS = 5;
 /** Time for a goodbye message to flush before its connection is torn down. */
@@ -17,6 +17,25 @@ export interface HostSessionEvents {
   onViewersChange?: (viewerIds: string[]) => void;
   /** Lost the signaling server; existing viewers keep watching meanwhile. */
   onSignalingChange?: (connected: boolean) => void;
+}
+
+export interface HostSessionOptions extends HostSessionEvents {
+  /** From the chosen quality mode; see videoProfileFor. */
+  degradationPreference?: RTCDegradationPreference;
+  /** Injectable for tests. */
+  makeCode?: () => string;
+}
+
+/** What the broadcaster's encoder is doing for one viewer (from getStats). */
+export interface ViewerVideoStats {
+  viewerId: string;
+  codec?: string;
+  encoderImplementation?: string;
+  powerEfficientEncoder?: boolean;
+  frameWidth?: number;
+  frameHeight?: number;
+  framesPerSecond?: number;
+  qualityLimitationReason?: string;
 }
 
 interface Viewer {
@@ -52,19 +71,17 @@ export class HostSession {
   private readonly createPeer: PeerFactory;
   private readonly events: HostSessionEvents;
   private readonly makeCode: () => string;
+  private readonly degradationPreference?: RTCDegradationPreference;
+  private readonly sdpTransform: (sdp: string) => string;
 
-  constructor(
-    stream: MediaStream,
-    config: SessionConfig,
-    createPeer: PeerFactory,
-    events: HostSessionEvents = {},
-    makeCode: () => string = generateCode,
-  ) {
+  constructor(stream: MediaStream, config: SessionConfig, createPeer: PeerFactory, options: HostSessionOptions = {}) {
     this.stream = stream;
     this.config = config;
     this.createPeer = createPeer;
-    this.events = events;
-    this.makeCode = makeCode;
+    this.events = options;
+    this.makeCode = options.makeCode ?? generateCode;
+    this.degradationPreference = options.degradationPreference;
+    this.sdpTransform = sessionSdpTransform(config.preferredVideoCodec);
   }
 
   get code(): string | null {
@@ -150,7 +167,7 @@ export class HostSession {
         setTimeout(() => conn.close(), FLUSH_MS);
         return;
       }
-      const call = peer.call(conn.peer, this.stream, { sdpTransform: enableOpusStereo });
+      const call = peer.call(conn.peer, this.stream, { sdpTransform: this.sdpTransform });
       const viewer: Viewer = { conn, call, closed: false };
       this.viewers.set(conn.peer, viewer);
       call.on("close", () => this.removeViewer(conn.peer));
@@ -173,12 +190,42 @@ export class HostSession {
 
   private viewersChanged() {
     this.events.onViewersChange?.([...this.viewers.keys()]);
-    const bitrate = maxBitrateForViewers(this.viewers.size);
+    const settings = {
+      maxBitrate: maxBitrateForViewers(this.viewers.size),
+      degradationPreference: this.degradationPreference,
+    };
     for (const viewer of this.viewers.values()) {
-      void applyMaxBitrate(() => viewer.call.peerConnection, bitrate, () => viewer.closed).catch((error) =>
-        console.warn("Couldn't apply the bitrate cap", error),
+      void applySenderSettings(() => viewer.call.peerConnection, settings, () => viewer.closed).catch((error) =>
+        console.warn("Couldn't apply the encoder settings", error),
       );
     }
+  }
+
+  /** Per-viewer encoder stats, for diagnostics and a future stats readout. */
+  async getVideoStats(): Promise<ViewerVideoStats[]> {
+    const results: ViewerVideoStats[] = [];
+    for (const [viewerId, viewer] of this.viewers) {
+      const pc = viewer.call.peerConnection;
+      if (!pc) continue;
+      const report = await pc.getStats();
+      const entry: ViewerVideoStats = { viewerId };
+      report.forEach((stat: Record<string, unknown>) => {
+        if (stat.type === "outbound-rtp" && stat.kind === "video") {
+          Object.assign(entry, {
+            encoderImplementation: stat.encoderImplementation,
+            powerEfficientEncoder: stat.powerEfficientEncoder,
+            frameWidth: stat.frameWidth,
+            frameHeight: stat.frameHeight,
+            framesPerSecond: stat.framesPerSecond,
+            qualityLimitationReason: stat.qualityLimitationReason,
+          });
+          const codec = typeof stat.codecId === "string" ? report.get(stat.codecId) : undefined;
+          if (codec && typeof codec.mimeType === "string") entry.codec = codec.mimeType;
+        }
+      });
+      results.push(entry);
+    }
+    return results;
   }
 }
 

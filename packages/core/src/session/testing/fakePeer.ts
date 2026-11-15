@@ -33,11 +33,13 @@ const tick = (fn: () => void) => queueMicrotask(fn);
 export class FakeSender {
   readonly track = { kind: "video" };
   readonly applied: number[] = [];
+  readonly degradation: (RTCDegradationPreference | undefined)[] = [];
   getParameters() {
     return { encodings: [{} as RTCRtpEncodingParameters] } as RTCRtpSendParameters;
   }
   async setParameters(parameters: RTCRtpSendParameters) {
     this.applied.push(parameters.encodings[0].maxBitrate!);
+    this.degradation.push(parameters.degradationPreference);
   }
 }
 

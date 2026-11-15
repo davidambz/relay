@@ -7,23 +7,31 @@
  * the cap steps down as the audience grows to keep total upload sane.
  */
 export function maxBitrateForViewers(viewerCount: number): number {
-  if (viewerCount <= 2) return 6_000_000;
-  if (viewerCount <= 4) return 4_000_000;
-  return 3_000_000;
+  // Sized for good home upload links (the intended audience); 1080p60
+  // game footage is where the extra headroom shows.
+  if (viewerCount <= 2) return 12_000_000;
+  if (viewerCount <= 4) return 10_000_000;
+  return 8_000_000;
 }
 
 const POLL_INTERVAL_MS = 200;
 const POLL_TIMEOUT_MS = 15_000;
 
+export interface SenderSettings {
+  maxBitrate: number;
+  degradationPreference?: RTCDegradationPreference;
+}
+
 /**
- * Applies a max bitrate to the video sender of a call. PeerJS creates the
- * RTCPeerConnection asynchronously and the sender has no encodings until
- * negotiation starts, so this polls briefly until there's something to set.
- * Resolves false if the call never got that far (it was closed, or timed out).
+ * Applies encoder settings to the video sender of a call. PeerJS creates
+ * the RTCPeerConnection asynchronously and the sender has no encodings
+ * until negotiation starts, so this polls briefly until there's something
+ * to set. Resolves false if the call never got that far (it was closed,
+ * or timed out).
  */
-export async function applyMaxBitrate(
+export async function applySenderSettings(
   getPeerConnection: () => RTCPeerConnection | null | undefined,
-  maxBitrate: number,
+  settings: SenderSettings,
   isClosed: () => boolean = () => false,
 ): Promise<boolean> {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
@@ -34,7 +42,8 @@ export async function applyMaxBitrate(
     if (sender) {
       const parameters = sender.getParameters();
       if (parameters.encodings && parameters.encodings.length > 0) {
-        parameters.encodings[0].maxBitrate = maxBitrate;
+        parameters.encodings[0].maxBitrate = settings.maxBitrate;
+        if (settings.degradationPreference) parameters.degradationPreference = settings.degradationPreference;
         await sender.setParameters(parameters);
         return true;
       }

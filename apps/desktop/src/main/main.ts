@@ -256,6 +256,11 @@ function scheduleDevCapture(window: BrowserWindow, pngPath: string, script?: str
       // viewer started by the test harness), capturing at the end.
       const keepOpenMs = Number(process.env.RELAY_DEV_KEEP_OPEN_MS ?? 0) || 0;
       if (keepOpenMs > 0) await new Promise((resolve) => setTimeout(resolve, keepOpenMs));
+      // A second script after the wait (e.g. read stats once viewers joined).
+      if (process.env.RELAY_DEV_FINAL_SCRIPT) {
+        const finalResult: unknown = await window.webContents.executeJavaScript(process.env.RELAY_DEV_FINAL_SCRIPT, true);
+        console.log("Dev final script result:", typeof finalResult === "string" ? finalResult : JSON.stringify(finalResult));
+      }
       // Hidden windows never paint, so capturePage would wait forever on
       // them (the main window hides while the mini player is open).
       const visible = BrowserWindow.getAllWindows().filter((candidate) => candidate.isVisible());

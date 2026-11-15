@@ -1,6 +1,44 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/**
+ * Reorders the m=video payload list so the named codec (and the RTX
+ * streams that repair it) come first, which makes both sides pick it if
+ * they support it. Unknown codecs leave the SDP untouched.
+ */
+export function preferVideoCodec(sdp: string, codec: string): string {
+  const lineBreak = sdp.includes("\r\n") ? "\r\n" : "\n";
+  const lines = sdp.split(lineBreak);
+  const preferred = new Set<string>();
+  for (const line of lines) {
+    const match = /^a=rtpmap:(\d+) ([^/]+)\//.exec(line);
+    if (match && match[2].toLowerCase() === codec.toLowerCase()) preferred.add(match[1]);
+  }
+  if (preferred.size === 0) return sdp;
+  for (const line of lines) {
+    const match = /^a=fmtp:(\d+) apt=(\d+)/.exec(line);
+    if (match && preferred.has(match[2])) preferred.add(match[1]);
+  }
+  return lines
+    .map((line) => {
+      const match = /^(m=video \d+ [^ ]+ )(.*)$/.exec(line);
+      if (!match) return line;
+      const payloads = match[2].split(" ");
+      const first = payloads.filter((pt) => preferred.has(pt));
+      const rest = payloads.filter((pt) => !preferred.has(pt));
+      return match[1] + [...first, ...rest].join(" ");
+    })
+    .join(lineBreak);
+}
+
+/** The SDP rewrite both sides apply: Opus stereo, plus the codec preference if any. */
+export function sessionSdpTransform(preferredVideoCodec?: string): (sdp: string) => string {
+  return (sdp) => {
+    const stereo = enableOpusStereo(sdp);
+    return preferredVideoCodec ? preferVideoCodec(stereo, preferredVideoCodec) : stereo;
+  };
+}
+
 const STEREO_PARAMS: Record<string, string> = {
   stereo: "1",
   "sprop-stereo": "1",

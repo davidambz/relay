@@ -18,7 +18,12 @@ describe("loadSessionConfig", () => {
   it("applies valid overrides", async () => {
     const turn = { urls: "turn:turn.example.com:3478", username: "u", credential: "c" };
     const config = await loadSessionConfig(storeWith({ iceServers: [turn], maxViewers: 3, server: { host: "peer.example.com", secure: true } }));
-    expect(config).toEqual({ iceServers: [turn], maxViewers: 3, server: { host: "peer.example.com", secure: true } });
+    expect(config).toEqual({ iceServers: [turn], maxViewers: 3, server: { host: "peer.example.com", secure: true }, preferredVideoCodec: "H264" });
+  });
+
+  it("lets storage switch the codec or go back to the browser default", async () => {
+    expect((await loadSessionConfig(storeWith({ preferredVideoCodec: "VP9" }))).preferredVideoCodec).toBe("VP9");
+    expect(await loadSessionConfig(storeWith({ preferredVideoCodec: null }))).not.toHaveProperty("preferredVideoCodec");
   });
 
   it("ignores malformed fields individually", async () => {
@@ -29,6 +34,6 @@ describe("loadSessionConfig", () => {
 
 describe("maxBitrateForViewers", () => {
   it("steps down as the audience grows", () => {
-    expect([1, 2, 3, 4, 5, 8].map(maxBitrateForViewers)).toEqual([6e6, 6e6, 4e6, 4e6, 3e6, 3e6]);
+    expect([1, 2, 3, 4, 5, 8].map(maxBitrateForViewers)).toEqual([12e6, 12e6, 10e6, 10e6, 8e6, 8e6]);
   });
 });
