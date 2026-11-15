@@ -1,9 +1,10 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Header } from "./components/Header";
 import { useI18n } from "./i18n/I18nContext";
+import { usePlatform } from "./platform/PlatformContext";
 import { useSystemTheme } from "./hooks/useSystemTheme";
 import { useStreamQuality } from "./hooks/useStreamQuality";
 import { Home } from "./screens/Home";
@@ -30,6 +31,13 @@ export function App() {
   const { t } = useI18n();
   const [route, setRoute] = useState<Route>({ screen: "home" });
   const [, rememberQuality] = useStreamQuality();
+  const platform = usePlatform();
+  const sessionActive = route.screen === "live" || route.screen === "viewing";
+
+  // Lets the shell hold back self-update restarts during a session.
+  useEffect(() => {
+    platform.setSessionActive?.(sessionActive);
+  }, [platform, sessionActive]);
 
   const handleSourceEnded = useCallback(() => {
     setRoute((current) => {
