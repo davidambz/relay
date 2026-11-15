@@ -29,6 +29,7 @@ export interface ViewerSessionEvents {
  */
 export class ViewerSession {
   private peer: PeerLike | null = null;
+  private conn: DataConnectionLike | null = null;
   private ended = false;
   private timeout: ReturnType<typeof setTimeout> | null = null;
   private readonly code: string;
@@ -49,10 +50,14 @@ export class ViewerSession {
     this.peer = peer;
     this.timeout = setTimeout(() => this.end("timeout"), VIEWER_STREAM_TIMEOUT_MS);
 
+    // PeerJS emits "open" again after every successful reconnect(); the
+    // DataConnection is peer to peer and survives the signaling blip, so
+    // only the first one connects (a second would make the host call us
+    // twice).
     peer.on("open", () => {
-      if (this.ended) return;
-      const conn = peer.connect(hostId, { serialization: "json", reliable: true });
-      this.watchConnection(conn);
+      if (this.ended || this.conn) return;
+      this.conn = peer.connect(hostId, { serialization: "json", reliable: true });
+      this.watchConnection(this.conn);
     });
     peer.on("call", (call: MediaConnectionLike) => this.answer(call, hostId));
     peer.on("error", (error: PeerError) => {
