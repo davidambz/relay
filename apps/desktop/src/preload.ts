@@ -27,7 +27,13 @@ const api: RelayDesktopApi = {
     ipcRenderer.on(IPC.updateStatus, handler);
     return () => ipcRenderer.removeListener(IPC.updateStatus, handler);
   },
-  setSessionActive: (active) => ipcRenderer.send(IPC.sessionActive, active),
+  setSession: (session) => ipcRenderer.send(IPC.session, session),
+  onQuitRequest(listener) {
+    const handler = () => listener();
+    ipcRenderer.on(IPC.quitRequest, handler);
+    return () => ipcRenderer.removeListener(IPC.quitRequest, handler);
+  },
+  answerQuit: (confirmed) => ipcRenderer.send(IPC.quitAnswer, confirmed),
   listSources: () => ipcRenderer.invoke(IPC.listSources),
   chooseSource: (id) => ipcRenderer.invoke(IPC.chooseSource, id),
   getTheme: () => ipcRenderer.invoke(IPC.getTheme),

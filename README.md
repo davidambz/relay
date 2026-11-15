@@ -16,6 +16,8 @@ Built for watching a friend's screen during a voice call: the broadcast can carr
   - sharing a **monitor** sends everything except Discord (Stable, PTB and Canary);
   - sound can be muted mid-broadcast.
 - A big copyable code, a preview of what's going out, and a lamp for each viewer watching. Closing the shared window ends the broadcast.
+- Change to another screen or window mid-broadcast, keeping the code and every viewer.
+- Lives in the notification area: closing the window keeps the broadcast going, and quitting mid-broadcast asks first.
 
 **Watching (Windows and Android)**
 
@@ -119,7 +121,7 @@ npm run dev -- --instances 2   # two windows: broadcast in one, watch in the oth
 npm run dev:web                # the UI alone in a browser (viewer only), handy for phone widths
 ```
 
-Every copy of Relay you open gets its own profile, so you can broadcast and watch on the same PC.
+In development, every copy you open gets its own profile, so you can broadcast and watch on the same PC. The installed app runs once: opening it again brings back the window it already has (from the notification area, say).
 
 ### Checks
 

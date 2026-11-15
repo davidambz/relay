@@ -53,9 +53,9 @@ export function createMobilePlatform(appVersion: string): Platform {
     async enterPictureInPicture() {
       await RelayPip.enter();
     },
-    setSessionActive(active) {
+    setSession(session) {
       // While watching: Home turns the app into a PiP window, screen stays on.
-      void RelayPip.setWatching({ active }).catch(() => {});
+      void RelayPip.setWatching({ active: session === "watching" }).catch(() => {});
     },
     async setImmersive(on) {
       await RelayScreen.setImmersive({ on });

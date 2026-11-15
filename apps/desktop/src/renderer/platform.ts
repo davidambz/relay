@@ -55,7 +55,14 @@ export function createDesktopPlatform(api: RelayDesktopApi = window.relay): Plat
           onStatus: (listener) => api.onUpdateStatus(listener),
         }
       : undefined,
-    setSessionActive: (active) => api.setSessionActive(active),
+    setSession: (session) => api.setSession(session),
+    onQuitRequest: (handler) =>
+      api.onQuitRequest(() => {
+        void handler().then(
+          (confirmed) => api.answerQuit(confirmed),
+          () => api.answerQuit(false),
+        );
+      }),
     onFloatingHover: (listener) => api.onFloatingHover(listener),
   };
 }

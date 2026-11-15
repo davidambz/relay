@@ -48,6 +48,16 @@ export const en: Strings = {
     audioLabel: "Send sound",
     audioDescription: "A window sends only its app's sound. A monitor sends everything except Discord.",
   },
+  dialog: {
+    close: "Close",
+  },
+  quitWhileLive: {
+    title: "You're broadcasting",
+    message: "Quit Relay and end the broadcast?",
+    detail: "Everyone watching will be disconnected.",
+    confirm: "Quit and end broadcast",
+    cancel: "Keep broadcasting",
+  },
   live: {
     changeSource: "Change source",
     switchingNotice: "Pick the new source. The broadcast stays live with the same code, and viewers switch over to it.",

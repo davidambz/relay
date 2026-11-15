@@ -67,8 +67,14 @@ export function useHostSession(stream: MediaStream, encoder: EncoderSettings): [
       }
     })();
 
+    // Quitting the app doesn't unmount React; end the broadcast explicitly
+    // so viewers get the "ended" goodbye right away.
+    const stopOnUnload = () => session?.stop();
+    window.addEventListener("pagehide", stopOnUnload);
+
     return () => {
       disposed = true;
+      window.removeEventListener("pagehide", stopOnUnload);
       sessionRef.current = null;
       session?.stop();
     };

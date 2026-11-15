@@ -4,18 +4,31 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, Menu, nativeTheme, screen, session, shell } from "electron";
-import type { CaptureSource, Theme } from "@relay/core";
+import type { CaptureSource, SessionKind, Theme } from "@relay/core";
 import { IPC } from "../shared/api";
 import { claimInstanceProfile } from "./instance";
 import { storeGet, storeSet } from "./store";
 import { hwndFromSourceId, listOpenWindows } from "./windowList";
 import { isAudioAvailable, startAudio, stopAllAudio, stopAudio } from "./audio";
 import { applyUpdate, checkForUpdate, getUpdateStatus, installOnQuit, scheduleUpdateChecks, setSessionActive } from "./updater";
+import { createTray, type RelayTray } from "./tray";
 
+// null: an installed Relay is already running; it gets "second-instance"
+// and shows itself, and this copy just quits.
 const instanceNumber = claimInstanceProfile();
+if (instanceNumber === null) app.quit();
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
 
 let mainWindow: BrowserWindow | null = null;
+// The viewer's mini player, while open (it stands in for the main window).
+let floatingWindow: BrowserWindow | null = null;
+let tray: RelayTray | null = null;
+let currentSession: SessionKind | null = null;
+// Quitting for real (vs. the window's X, which hides to the tray).
+let quitting = false;
+// Quitting while broadcasting was confirmed (or doesn't need asking).
+let quitApproved = false;
+const HINT_KEY = "tray.hintShown";
 // Picked in our own source picker; consumed by the display-media handler
 // when the renderer calls getDisplayMedia().
 let chosenSourceId: string | null = null;
@@ -83,7 +96,17 @@ function registerIpc() {
     await checkForUpdate();
   });
   ipcMain.handle(IPC.updateApply, () => applyUpdate());
-  ipcMain.on(IPC.sessionActive, (_event, active: unknown) => setSessionActive(active === true));
+  ipcMain.on(IPC.quitAnswer, (_event, confirmed: unknown) => {
+    confirmingQuit = false;
+    if (confirmed !== true) return;
+    quitApproved = true;
+    app.quit();
+  });
+  ipcMain.on(IPC.session, (_event, value: unknown) => {
+    currentSession = value === "broadcasting" || value === "watching" ? value : null;
+    setSessionActive(currentSession !== null);
+    tray?.setSession(currentSession);
+  });
   ipcMain.handle(IPC.copyText, (_event, text: unknown) => {
     if (typeof text !== "string" || text.length > 1000) throw new Error("copyText expects a short string");
     clipboard.writeText(text);
@@ -154,7 +177,7 @@ function createWindow() {
     minWidth: 400,
     minHeight: 560,
     show: false,
-    title: instanceNumber > 1 ? `Relay (${instanceNumber})` : "Relay",
+    title: (instanceNumber ?? 1) > 1 ? `Relay (${instanceNumber})` : "Relay",
     backgroundColor: backgroundFor(theme),
     autoHideMenuBar: true,
     webPreferences: {
@@ -179,6 +202,14 @@ function createWindow() {
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
   });
+  // The X hides Relay to the tray instead of quitting, so a broadcast
+  // keeps going; the tray's Quit (or quitting from anywhere) closes it.
+  window.on("close", (event) => {
+    if (quitting || !tray) return;
+    event.preventDefault();
+    window.hide();
+    tray.showStillRunningHint();
+  });
 
   // The only popup allowed is the mini player (an about:blank child the
   // renderer portals into, see packages/ui useChildWindow). External links
@@ -192,6 +223,7 @@ function createWindow() {
   });
   window.webContents.on("did-create-window", (child, details) => {
     if (details.frameName !== FLOATING_WINDOW_NAME) return;
+    floatingWindow = child;
     child.setAspectRatio(16 / 9);
     child.setAlwaysOnTop(true, "floating");
     child.setMenu(null);
@@ -199,6 +231,7 @@ function createWindow() {
     window.hide();
     const stopHoverTracking = trackFloatingHover(child, window);
     child.on("closed", () => {
+      if (floatingWindow === child) floatingWindow = null;
       stopHoverTracking();
       if (!window.isDestroyed()) window.show();
     });
@@ -351,6 +384,8 @@ function scheduleDevCapture(window: BrowserWindow, pngPath: string, script?: str
       console.error("Dev capture failed", error);
       process.exitCode = 1;
     } finally {
+      // Never stop a scripted run on the "quit while broadcasting?" prompt.
+      quitApproved = true;
       app.quit();
     }
   });
@@ -358,7 +393,44 @@ function scheduleDevCapture(window: BrowserWindow, pngPath: string, script?: str
 
 Menu.setApplicationMenu(null);
 
+/** Brings Relay back: the mini player if it's open, else the main window. */
+function showApp() {
+  const target = floatingWindow && !floatingWindow.isDestroyed() ? floatingWindow : mainWindow;
+  if (!target || target.isDestroyed()) return;
+  if (target.isMinimized()) target.restore();
+  target.show();
+  target.focus();
+}
+
+/**
+ * Quitting mid-broadcast ends it for everyone, so the app asks first, in
+ * its own dialog (the UI's, not a native message box): main brings the
+ * window up and the page answers through IPC.quitAnswer.
+ */
+let confirmingQuit = false;
+app.on("before-quit", (event) => {
+  const window = mainWindow;
+  if (quitApproved || currentSession !== "broadcasting" || !window || window.isDestroyed()) {
+    quitting = true;
+    return;
+  }
+  event.preventDefault();
+  showApp();
+  if (confirmingQuit) return;
+  confirmingQuit = true;
+  window.webContents.send(IPC.quitRequest);
+});
+
+app.on("second-instance", () => showApp());
+
 app.whenReady().then(() => {
+  if (instanceNumber === null) return;
+  tray = createTray({
+    onOpen: showApp,
+    onQuit: () => app.quit(),
+    hintShown: () => storeGet(HINT_KEY) === true,
+    markHintShown: () => storeSet(HINT_KEY, true),
+  });
   registerIpc();
   registerPermissionHandlers();
   registerDisplayMediaHandler();

@@ -5,7 +5,7 @@
 // renderer's PlatformDesktop adapter. Kept tiny and serializable: the
 // renderer never sees Electron or Node objects.
 
-import type { CaptureSource, Theme, UpdateStatus } from "@relay/core";
+import type { CaptureSource, SessionKind, Theme, UpdateStatus } from "@relay/core";
 
 export interface InstanceInfo {
   /** 1 for the first copy running, 2+ for extra copies (separate profile). */
@@ -31,7 +31,10 @@ export interface RelayDesktopApi {
   updateCheck(): Promise<void>;
   updateApply(): Promise<void>;
   onUpdateStatus(listener: (status: UpdateStatus) => void): () => void;
-  setSessionActive(active: boolean): void;
+  setSession(session: SessionKind | null): void;
+  /** Main asks whether to quit mid-broadcast; answer with answerQuit. */
+  onQuitRequest(listener: () => void): () => void;
+  answerQuit(confirmed: boolean): void;
   listSources(): Promise<CaptureSource[]>;
   chooseSource(id: string): Promise<void>;
   getTheme(): Promise<Theme>;
@@ -60,6 +63,8 @@ export const IPC = {
   updateCheck: "update:check",
   updateApply: "update:apply",
   updateStatus: "update:status",
-  sessionActive: "session:active",
+  session: "session:changed",
+  quitRequest: "quit:request",
+  quitAnswer: "quit:answer",
   floatingHover: "floating:hover",
 } as const;

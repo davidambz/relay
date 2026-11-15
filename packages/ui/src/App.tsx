@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useCallback, useEffect, useState } from "react";
+import { Button } from "./components/Button";
+import { Dialog } from "./components/Dialog";
 import { Header } from "./components/Header";
 import { useI18n } from "./i18n/I18nContext";
 import { usePlatform } from "./platform/PlatformContext";
@@ -32,12 +34,28 @@ export function App() {
   const [route, setRoute] = useState<Route>({ screen: "home" });
   const [, rememberQuality] = useStreamQuality();
   const platform = usePlatform();
-  const sessionActive = route.screen === "live" || route.screen === "viewing";
+  const session = route.screen === "live" ? "broadcasting" : route.screen === "viewing" ? "watching" : null;
 
-  // Lets the shell hold back self-update restarts during a session.
+  // Lets the shell hold back update restarts, light its tray, and so on.
   useEffect(() => {
-    platform.setSessionActive?.(sessionActive);
-  }, [platform, sessionActive]);
+    platform.setSession?.(session);
+  }, [platform, session]);
+
+  // Desktop: quitting mid-broadcast (e.g. from the tray) asks here first.
+  const [quitPrompt, setQuitPrompt] = useState<((confirmed: boolean) => void) | null>(null);
+  useEffect(
+    () =>
+      platform.onQuitRequest?.(
+        () =>
+          new Promise<boolean>((resolve) => {
+            setQuitPrompt(() => (confirmed: boolean) => {
+              setQuitPrompt(null);
+              resolve(confirmed);
+            });
+          }),
+      ),
+    [platform],
+  );
 
   // Android: the whole app is the PiP window; only the video should show.
   const [pictureInPicture, setPictureInPicture] = useState(false);
@@ -132,6 +150,25 @@ export function App() {
           />
         )}
       </main>
+      {quitPrompt && (
+        <Dialog
+          title={t.quitWhileLive.title}
+          onClose={() => quitPrompt(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => quitPrompt(false)}>
+                {t.quitWhileLive.cancel}
+              </Button>
+              <Button variant="danger" onClick={() => quitPrompt(true)}>
+                {t.quitWhileLive.confirm}
+              </Button>
+            </>
+          }
+        >
+          <p className={styles.quitMessage}>{t.quitWhileLive.message}</p>
+          <p className={styles.quitDetail}>{t.quitWhileLive.detail}</p>
+        </Dialog>
+      )}
     </div>
   );
 }
