@@ -57,6 +57,7 @@ jobs:
           RELAY_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           RELAY_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          RELEASE_CERT_SHA256: 653ccce1a10159263ac6106317e6c1a317b01e7f2d5dfebdf232cb3a8968dbf3
         run: |
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/relay-release.p12"
           export RELAY_KEYSTORE_FILE="$RUNNER_TEMP/relay-release.p12"
@@ -67,4 +68,7 @@ jobs:
           # Print apksigner's whole answer (certificate DN and digests are
           # public), then require a signer.
           "$apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk 2>&1 | tee "$RUNNER_TEMP/apksigner.txt"
-          grep -q "Signer #1 certificate" "$RUNNER_TEMP/apksigner.txt"
+          # Must verify, and with the release certificate (its public
+          # SHA-256 fingerprint), not some other key.
+          grep -qx "Verifies" "$RUNNER_TEMP/apksigner.txt"
+          grep -q "certificate SHA-256 digest: $RELEASE_CERT_SHA256" "$RUNNER_TEMP/apksigner.txt"
