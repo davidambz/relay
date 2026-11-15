@@ -139,6 +139,41 @@ describe("host and viewer together", () => {
     expect(viewerLists.at(-1)).toHaveLength(1);
   });
 
+  it("doesn't connect twice when the viewer's signaling reconnects", async () => {
+    const network = new FakeNetwork();
+    const viewerLists: string[][] = [];
+    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });
+    await host.start();
+    const { result } = watch(network, "ABC234");
+    await flush();
+    const viewerPeer = network.created.find((peer) => peer.id.startsWith("auto-"))!;
+    viewerPeer.emit("disconnected");
+    await flush();
+    expect(network.peers.get("relay-tenno-v1-ABC234")!.calls).toHaveLength(1);
+    expect(viewerLists.at(-1)).toHaveLength(1);
+    expect(result.ended).toBeUndefined();
+  });
+
+  it("replaces a viewer that connects again without counting it twice", async () => {
+    const network = new FakeNetwork();
+    const viewerLists: string[][] = [];
+    const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });
+    await host.start();
+    watch(network, "ABC234");
+    await flush();
+    const viewerPeer = network.created.find((peer) => peer.id.startsWith("auto-"))!;
+    const firstConn = viewerPeer.connections[0];
+    viewerPeer.connect("relay-tenno-v1-ABC234");
+    await flush();
+    const hostCalls = network.peers.get("relay-tenno-v1-ABC234")!.calls;
+    expect(hostCalls).toHaveLength(2);
+    expect(viewerLists.at(-1)).toHaveLength(1);
+    // Late events from the replaced connection don't drop its successor.
+    firstConn.close();
+    await flush();
+    expect(viewerLists.at(-1)).toHaveLength(1);
+  });
+
   it("drops a viewer from the count when they leave", async () => {
     const network = new FakeNetwork();
     const viewerLists: string[][] = [];

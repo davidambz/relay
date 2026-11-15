@@ -155,8 +155,12 @@ export class FakePeer extends FakeEmitter implements PeerLike {
     });
     return local;
   }
+  /** Like PeerJS: a successful reconnect emits "open" again. */
   reconnect() {
     this.disconnected = false;
+    tick(() => {
+      if (!this.destroyed) this.emit("open", this.id);
+    });
   }
   destroy() {
     if (this.destroyed) return;
