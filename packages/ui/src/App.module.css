@@ -21,3 +21,12 @@
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
+
+/* Wraps a session's screen so it can be hidden without unmounting. */
+.sessionHolder {
+  display: contents;
+}
+
+.sessionHolder[hidden] {
+  display: none;
+}

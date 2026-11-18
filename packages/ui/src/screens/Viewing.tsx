@@ -15,6 +15,8 @@ interface ViewingProps {
   code: string;
   /** The app is in the system's Picture-in-Picture window (Android). */
   pictureInPicture?: boolean;
+  /** False while the person is on their own broadcast's screen. */
+  active?: boolean;
   onLeave: () => void;
   onEnded: (reason: ViewerEndReason) => void;
 }
@@ -24,7 +26,7 @@ interface ViewingProps {
  * mini-player window. Both players read one stream and one volume state;
  * only the visible one is fed the stream.
  */
-export function Viewing({ code, onLeave, onEnded, pictureInPicture = false }: ViewingProps) {
+export function Viewing({ code, onLeave, onEnded, pictureInPicture = false, active = true }: ViewingProps) {
   const { t } = useI18n();
   const session = useViewerSession(code);
   const audio = useVolume();
@@ -47,6 +49,7 @@ export function Viewing({ code, onLeave, onEnded, pictureInPicture = false }: Vi
         onLeave={onLeave}
         onFloatingWindow={() => setFloating(true)}
         pictureInPicture={pictureInPicture}
+        active={active}
       />
       {floatingContainer && (
         <FloatingPlayer

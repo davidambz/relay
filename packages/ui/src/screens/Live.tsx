@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { applyQualityToTrack, videoProfileFor, type StreamQuality } from "@relay/core";
 import { Button } from "../components/Button";
-import { CopyIcon, RefreshIcon } from "../components/icons";
+import { CopyIcon, RefreshIcon, WatchIcon } from "../components/icons";
 import { QualityPicker } from "../components/QualityPicker";
 import { Toggle } from "../components/Toggle";
 import { useI18n } from "../i18n/I18nContext";
@@ -17,12 +17,20 @@ import styles from "./Live.module.css";
 interface LiveProps {
   broadcast: StartedBroadcast;
   onStop: () => void;
+  /** Go watch another broadcast; this one keeps running meanwhile. */
+  onWatch?: () => void;
   /** The captured source went away on its own (window closed). */
   onSourceEnded: () => void;
   /** Start over with a fresh session (after the signaling server failed). */
   onRetry: () => void;
   /** Remember a quality change made mid-broadcast. */
   onQualityChange: (quality: StreamQuality) => void;
+  /** The share code once on air (null until then), for the rest of the app. */
+  onCode?: (code: string | null) => void;
+  /** Shown above the broadcast, e.g. why the watched broadcast went away. */
+  notice?: string;
+  /** False while hidden behind another screen: the broadcast keeps going, the preview rests. */
+  active?: boolean;
 }
 
 function encoderSettingsFor(quality: StreamQuality) {
@@ -30,7 +38,17 @@ function encoderSettingsFor(quality: StreamQuality) {
   return { degradationPreference, bitrateScale };
 }
 
-export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChange }: LiveProps) {
+export function Live({
+  broadcast,
+  onStop,
+  onWatch,
+  onSourceEnded,
+  onRetry,
+  onQualityChange,
+  onCode,
+  notice,
+  active = true,
+}: LiveProps) {
   const { t } = useI18n();
   const platform = usePlatform();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -59,15 +77,21 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChang
   const [sourceVersion, setSourceVersion] = useState(0);
 
   // The preview remounts after the picker closes and after a switch, so
-  // it's re-pointed at the (same, but re-tracked) stream each time.
+  // it's re-pointed at the (same, but re-tracked) stream each time. While
+  // hidden it's detached, so it doesn't decode frames nobody sees.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !active) return;
     video.srcObject = broadcast.stream;
     return () => {
       video.srcObject = null;
     };
-  }, [broadcast.stream, switching, sourceVersion]);
+  }, [broadcast.stream, switching, sourceVersion, active]);
+
+  const liveCode = live?.code ?? null;
+  useEffect(() => {
+    onCode?.(liveCode);
+  }, [onCode, liveCode]);
 
   // Closing the shared window ends its video track; end the broadcast with
   // it. Re-subscribed after a switch, to whichever source is live now.
@@ -150,6 +174,11 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChang
 
   return (
     <div className={screen.screen}>
+      {notice && (
+        <p className={screen.note} role="status">
+          {notice}
+        </p>
+      )}
       {switchError && (
         <p className={screen.error} role="alert">
           {t.live.switchFailed}
@@ -239,7 +268,12 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChang
             )}
           </section>
 
-          <Button variant="danger" onClick={onStop} className={styles.stop}>
+          {onWatch && (
+            <Button variant="secondary" onClick={onWatch} className={styles.sideAction}>
+              <WatchIcon /> {t.live.watchOther}
+            </Button>
+          )}
+          <Button variant="danger" onClick={onStop} className={styles.sideAction}>
             {t.live.stop}
           </Button>
         </aside>
