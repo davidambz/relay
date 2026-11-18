@@ -14,18 +14,21 @@ interface WatchProps {
   notice?: string;
   onBack: () => void;
   onWatch: (code: string) => void;
+  /** The person's own broadcast code, while on air: watching it would loop. */
+  ownCode?: string;
 }
 
-export function Watch({ notice, onBack, onWatch }: WatchProps) {
+export function Watch({ notice, onBack, onWatch, ownCode }: WatchProps) {
   const { t } = useI18n();
   const [code, setCode] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const valid = isValidCode(code);
+  const own = valid && code === ownCode;
 
   function submit(event: FormEvent) {
     event.preventDefault();
     setSubmitted(true);
-    if (valid) onWatch(code);
+    if (valid && !own) onWatch(code);
   }
 
   return (
@@ -55,7 +58,7 @@ export function Watch({ notice, onBack, onWatch }: WatchProps) {
             spellCheck={false}
             inputMode="text"
             aria-describedby="watch-code-hint"
-            aria-invalid={submitted && !valid}
+            aria-invalid={submitted && (!valid || own)}
             placeholder={"·".repeat(CODE_LENGTH)}
             autoFocus
           />
@@ -66,6 +69,11 @@ export function Watch({ notice, onBack, onWatch }: WatchProps) {
         {submitted && !valid && (
           <p className={screen.error} role="alert">
             {t.watch.codeInvalid}
+          </p>
+        )}
+        {submitted && own && (
+          <p className={screen.error} role="alert">
+            {t.watch.ownCode}
           </p>
         )}
       </section>

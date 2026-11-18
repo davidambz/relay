@@ -86,12 +86,14 @@ export interface Strings {
     viewersCount: (count: number, max?: number) => string;
     noViewersYet: string;
     watchOther: string;
+    watchedEnded: string;
     sourceEnded: string;
   };
   watch: {
     codeLabel: string;
     codeHint: string;
     codeInvalid: string;
+    ownCode: string;
     back: string;
     watch: string;
     ended: string;

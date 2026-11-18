@@ -60,6 +60,14 @@ export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWi
     wasPictureInPicture.current = pictureInPicture;
   }, [pictureInPicture, chrome]);
 
+  // Back on screen after another one was on top: show the controls again
+  // (their countdown ran out while hidden).
+  const wasActive = useRef(active);
+  useEffect(() => {
+    if (!wasActive.current && active) chrome.show();
+    wasActive.current = active;
+  }, [active, chrome]);
+
   // Phones: fullscreen also means no system bars and landscape. Leaving
   // fullscreen (or the player) puts both back.
   const { setImmersive } = platform;

@@ -45,7 +45,7 @@ async function otherBroadcast(network: FakeNetwork) {
     </PlatformContext.Provider>,
   );
   const code = (await within(theirs.container).findByText(/^[A-Z2-9]{6}$/)).textContent!;
-  return { code, container: theirs.container };
+  return { code, container: theirs.container, stop: theirs.unmount };
 }
 
 function renderApp(network = new FakeNetwork()) {
@@ -126,5 +126,35 @@ describe("broadcasting while watching", () => {
     expect(track.stop).toHaveBeenCalled();
     expect(setSession).toHaveBeenLastCalledWith(null);
     expect(screen.getByRole("status")).toHaveTextContent("Standby");
+  });
+
+  it("won't watch its own broadcast", async () => {
+    const network = new FakeNetwork();
+    const { app } = renderApp(network);
+    const mine = await goLive(app);
+    fireEvent.click(app.getByRole("button", { name: "Watch another broadcast" }));
+    fireEvent.change(await app.findByLabelText("Broadcast code"), { target: { value: mine } });
+    fireEvent.click(app.getByRole("button", { name: "Watch" }));
+
+    expect(app.getByRole("alert")).toHaveTextContent("That's your own broadcast's code");
+    expect(app.queryByRole("button", { name: "Leave" })).not.toBeInTheDocument();
+  });
+
+  it("says so on the broadcast's screen when the watched one ends there", async () => {
+    const network = new FakeNetwork();
+    const theirs = await otherBroadcast(network);
+    const { app } = renderApp(network);
+    const mine = await goLive(app);
+    fireEvent.click(app.getByRole("button", { name: "Watch another broadcast" }));
+    fireEvent.change(await app.findByLabelText("Broadcast code"), { target: { value: theirs.code } });
+    fireEvent.click(app.getByRole("button", { name: "Watch" }));
+    await within(theirs.container).findByText("1");
+    fireEvent.click(app.getByRole("radio", { name: "Your broadcast" }));
+
+    theirs.stop();
+
+    expect(await app.findByText(/The broadcast you were watching ended/)).toBeInTheDocument();
+    expect(within(app.getByRole("main")).getByText(mine)).toBeVisible();
+    expect(app.queryByRole("radiogroup", { name: "Switch between broadcasts" })).not.toBeInTheDocument();
   });
 });

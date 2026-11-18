@@ -1,7 +1,7 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "./components/Button";
 import { Dialog } from "./components/Dialog";
 import { Header } from "./components/Header";
@@ -49,9 +49,13 @@ export function App() {
   const [watchingCode, setWatchingCode] = useState<string | null>(null);
   // Read by the Android back handler, which is registered once.
   const routeRef = useRef(route);
-  useEffect(() => {
+  useLayoutEffect(() => {
     routeRef.current = route;
   }, [route]);
+  /** The broadcast's share code once it's up, so Watch can refuse it. */
+  const [liveCode, setLiveCode] = useState<string | null>(null);
+  /** Why the watched broadcast went away while the broadcast's screen was up. */
+  const [liveNotice, setLiveNotice] = useState<string>();
   const [, rememberQuality] = useStreamQuality();
   const platform = usePlatform();
   const watching = watchingCode !== null;
@@ -113,8 +117,11 @@ export function App() {
       if (current) stopStream(current.broadcast.stream);
       return null;
     });
+    setLiveNotice(undefined);
     // Watching something meanwhile? Don't pull the person out of it.
-    setRoute((current) => (current.screen === "live" ? { screen: "pick", notice: t.live.sourceEnded } : current));
+    setRoute((current) =>
+      current.screen === "live" || current.screen === "watch" ? { screen: "pick", notice: t.live.sourceEnded } : current,
+    );
   }, [t]);
 
   const handleViewerEnded = useCallback(
@@ -128,8 +135,9 @@ export function App() {
         left: undefined,
       };
       setWatchingCode(null);
-      // On their own broadcast's screen meanwhile? Leave them there.
-      setRoute((current) => (current.screen === "viewing" ? { screen: "watch", notice: notices[reason] } : current));
+      // On their own broadcast's screen meanwhile? Leave them there, and say why.
+      if (routeRef.current.screen === "viewing") setRoute({ screen: "watch", notice: notices[reason] });
+      else if (reason !== "left") setLiveNotice(t.live.watchedEnded);
     },
     [t],
   );
@@ -178,6 +186,7 @@ export function App() {
               onStop={() => {
                 stopStream(onAir.broadcast.stream);
                 setOnAir(null);
+                setLiveNotice(undefined);
                 setRoute({ screen: "pick" });
               }}
               // Already watching one: the header switches between the two.
@@ -185,6 +194,9 @@ export function App() {
               onSourceEnded={handleSourceEnded}
               onRetry={() => setOnAir({ ...onAir, attempt: onAir.attempt + 1 })}
               onQualityChange={rememberQuality}
+              onCode={setLiveCode}
+              notice={liveNotice}
+              active={route.screen === "live"}
             />
           </div>
         )}
@@ -192,7 +204,9 @@ export function App() {
           <Watch
             notice={route.notice}
             onBack={() => setRoute({ screen: "home" })}
+            ownCode={onAir ? (liveCode ?? undefined) : undefined}
             onWatch={(code) => {
+              setLiveNotice(undefined);
               setWatchingCode(code);
               setRoute({ screen: "viewing" });
             }}
