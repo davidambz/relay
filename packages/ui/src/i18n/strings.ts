@@ -6,12 +6,20 @@ export interface Strings {
     statusIdle: string;
     statusLive: string;
     statusWatching: string;
+    statusLiveWatching: string;
+    returnToLive: string;
+    viewsLabel: string;
+    viewLive: string;
+    viewWatching: string;
   };
   home: {
     broadcastLabel: string;
     broadcastTitle: string;
     broadcastDescription: string;
     broadcastButton: string;
+    liveTitle: string;
+    liveDescription: string;
+    liveButton: string;
     watchLabel: string;
     watchTitle: string;
     watchDescription: string;
@@ -77,6 +85,7 @@ export interface Strings {
     /** The viewer readout: just the count, or "N of M" when a cap is configured. */
     viewersCount: (count: number, max?: number) => string;
     noViewersYet: string;
+    watchOther: string;
     sourceEnded: string;
   };
   watch: {

@@ -26,9 +26,11 @@ interface PlayerProps {
    * show only the picture, no badge or controls.
    */
   pictureInPicture?: boolean;
+  /** False while another screen is on top (the player keeps playing, hidden). */
+  active?: boolean;
 }
 
-export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWindow, pictureInPicture = false }: PlayerProps) {
+export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWindow, pictureInPicture = false, active = true }: PlayerProps) {
   const { t } = useI18n();
   const platform = usePlatform();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,6 +92,7 @@ export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWi
 
   // Shortcuts: global while the player is on screen, except when typing.
   useEffect(() => {
+    if (!active) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || isTypingTarget(event.target)) return;
       const action = actionForKey(event);
@@ -103,7 +106,7 @@ export function Player({ stream, code, placeholder, audio, onLeave, onFloatingWi
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [fullscreen, toggleMuted, chrome, canFloat, openFloating]);
+  }, [active, fullscreen, toggleMuted, chrome, canFloat, openFloating]);
 
   function onStagePointer(event: PointerEvent<HTMLDivElement>) {
     if (event.pointerType === "touch") return;

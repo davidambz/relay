@@ -1,7 +1,7 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "./components/Button";
 import { Dialog } from "./components/Dialog";
 import { Header } from "./components/Header";
@@ -20,9 +20,21 @@ import styles from "./App.module.css";
 type Route =
   | { screen: "home" }
   | { screen: "pick"; notice?: string }
-  | { screen: "live"; broadcast: StartedBroadcast; attempt: number }
+  | { screen: "live" }
   | { screen: "watch"; notice?: string }
-  | { screen: "viewing"; code: string };
+  | { screen: "viewing" };
+
+/**
+ * The broadcast and the broadcast being watched live beside the route,
+ * not in it: someone on air can watch another broadcast (desktop) and
+ * switch between the two screens, each kept mounted (hidden when the
+ * other is on screen) so neither session ends.
+ */
+interface OnAir {
+  broadcast: StartedBroadcast;
+  /** Bumped to start a fresh host session after a failure. */
+  attempt: number;
+}
 
 function stopStream(stream: MediaStream) {
   for (const track of stream.getTracks()) track.stop();
@@ -32,9 +44,20 @@ export function App() {
   useSystemTheme();
   const { t } = useI18n();
   const [route, setRoute] = useState<Route>({ screen: "home" });
+  const [onAir, setOnAir] = useState<OnAir | null>(null);
+  /** The code being watched, if any. */
+  const [watchingCode, setWatchingCode] = useState<string | null>(null);
+  // Read by the Android back handler, which is registered once.
+  const routeRef = useRef(route);
+  useEffect(() => {
+    routeRef.current = route;
+  }, [route]);
   const [, rememberQuality] = useStreamQuality();
   const platform = usePlatform();
-  const session = route.screen === "live" ? "broadcasting" : route.screen === "viewing" ? "watching" : null;
+  const watching = watchingCode !== null;
+  const onPlayer = route.screen === "viewing";
+  // Broadcasting outranks watching: the shell asks before quitting it.
+  const session = onAir ? "broadcasting" : watching ? "watching" : null;
 
   // Lets the shell hold back update restarts, light its tray, and so on.
   useEffect(() => {
@@ -71,22 +94,27 @@ export function App() {
         void document.exitFullscreen().catch(() => {});
         return true;
       }
-      let handled = true;
-      setRoute((current) => {
-        if (current.screen === "viewing") return { screen: "watch" };
-        if (current.screen === "watch" || current.screen === "pick") return { screen: "home" };
-        handled = false;
-        return current;
-      });
-      return handled;
+      const current = routeRef.current.screen;
+      if (current === "viewing") {
+        setWatchingCode(null);
+        setRoute({ screen: "watch" });
+        return true;
+      }
+      if (current === "watch" || current === "pick") {
+        setRoute({ screen: "home" });
+        return true;
+      }
+      return false;
     });
   }, [platform]);
 
   const handleSourceEnded = useCallback(() => {
-    setRoute((current) => {
-      if (current.screen === "live") stopStream(current.broadcast.stream);
-      return { screen: "pick", notice: t.live.sourceEnded };
+    setOnAir((current) => {
+      if (current) stopStream(current.broadcast.stream);
+      return null;
     });
+    // Watching something meanwhile? Don't pull the person out of it.
+    setRoute((current) => (current.screen === "live" ? { screen: "pick", notice: t.live.sourceEnded } : current));
   }, [t]);
 
   const handleViewerEnded = useCallback(
@@ -99,55 +127,92 @@ export function App() {
         network: t.watch.network,
         left: undefined,
       };
-      setRoute({ screen: "watch", notice: notices[reason] });
+      setWatchingCode(null);
+      // On their own broadcast's screen meanwhile? Leave them there.
+      setRoute((current) => (current.screen === "viewing" ? { screen: "watch", notice: notices[reason] } : current));
     },
     [t],
   );
 
   return (
     <div className={styles.app}>
-      {!(pictureInPicture && route.screen === "viewing") && (
-        <Header status={route.screen === "live" ? "live" : route.screen === "viewing" ? "watching" : "idle"} />
+      {!(pictureInPicture && onPlayer) && (
+        <Header
+          status={onAir ? (watching ? "live-watching" : "live") : watching ? "watching" : "idle"}
+          view={
+            onAir && watching && (route.screen === "live" || onPlayer)
+              ? {
+                  current: onPlayer ? "watching" : "live",
+                  onChange: (view) => setRoute({ screen: view === "live" ? "live" : "viewing" }),
+                }
+              : undefined
+          }
+          onReturnToLive={onAir && !watching && route.screen !== "live" ? () => setRoute({ screen: "live" }) : undefined}
+        />
       )}
       <main className={styles.main}>
         {route.screen === "home" && (
-          <Home onBroadcast={() => setRoute({ screen: "pick" })} onWatch={() => setRoute({ screen: "watch" })} />
+          <Home
+            live={onAir !== null}
+            onBroadcast={() => setRoute({ screen: onAir ? "live" : "pick" })}
+            onWatch={() => setRoute({ screen: "watch" })}
+          />
         )}
         {route.screen === "pick" && (
           <SourcePicker
             notice={route.notice}
             onBack={() => setRoute({ screen: "home" })}
-            onStarted={(broadcast) => setRoute({ screen: "live", broadcast, attempt: 0 })}
+            onStarted={(broadcast) => {
+              setOnAir({ broadcast, attempt: 0 });
+              setRoute({ screen: "live" });
+            }}
           />
         )}
-        {route.screen === "live" && (
-          <Live
-            // A new key remounts Live, which starts a fresh host session.
-            key={route.attempt}
-            broadcast={route.broadcast}
-            onStop={() => {
-              stopStream(route.broadcast.stream);
-              setRoute({ screen: "pick" });
-            }}
-            onSourceEnded={handleSourceEnded}
-            onRetry={() => setRoute({ ...route, attempt: route.attempt + 1 })}
-            onQualityChange={rememberQuality}
-          />
+        {onAir && (
+          // Hidden, not unmounted, on other screens: unmounting ends the broadcast.
+          <div hidden={route.screen !== "live"} className={styles.sessionHolder}>
+            <Live
+              // A new key remounts Live, which starts a fresh host session.
+              key={onAir.attempt}
+              broadcast={onAir.broadcast}
+              onStop={() => {
+                stopStream(onAir.broadcast.stream);
+                setOnAir(null);
+                setRoute({ screen: "pick" });
+              }}
+              // Already watching one: the header switches between the two.
+              onWatch={watching ? undefined : () => setRoute({ screen: "watch" })}
+              onSourceEnded={handleSourceEnded}
+              onRetry={() => setOnAir({ ...onAir, attempt: onAir.attempt + 1 })}
+              onQualityChange={rememberQuality}
+            />
+          </div>
         )}
         {route.screen === "watch" && (
           <Watch
             notice={route.notice}
             onBack={() => setRoute({ screen: "home" })}
-            onWatch={(code) => setRoute({ screen: "viewing", code })}
+            onWatch={(code) => {
+              setWatchingCode(code);
+              setRoute({ screen: "viewing" });
+            }}
           />
         )}
-        {route.screen === "viewing" && (
-          <Viewing
-            code={route.code}
-            pictureInPicture={pictureInPicture}
-            onLeave={() => setRoute({ screen: "watch" })}
-            onEnded={handleViewerEnded}
-          />
+        {watchingCode !== null && (
+          // Hidden, not unmounted, on the broadcast's screen: it keeps playing.
+          <div hidden={!onPlayer} className={styles.sessionHolder}>
+            <Viewing
+              key={watchingCode}
+              code={watchingCode}
+              active={onPlayer}
+              pictureInPicture={pictureInPicture}
+              onLeave={() => {
+                setWatchingCode(null);
+                setRoute({ screen: "watch" });
+              }}
+              onEnded={handleViewerEnded}
+            />
+          </div>
         )}
       </main>
       {quitPrompt && (

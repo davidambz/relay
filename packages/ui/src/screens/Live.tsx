@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { applyQualityToTrack, videoProfileFor, type StreamQuality } from "@relay/core";
 import { Button } from "../components/Button";
-import { CopyIcon, RefreshIcon } from "../components/icons";
+import { CopyIcon, RefreshIcon, WatchIcon } from "../components/icons";
 import { QualityPicker } from "../components/QualityPicker";
 import { Toggle } from "../components/Toggle";
 import { useI18n } from "../i18n/I18nContext";
@@ -17,6 +17,8 @@ import styles from "./Live.module.css";
 interface LiveProps {
   broadcast: StartedBroadcast;
   onStop: () => void;
+  /** Go watch another broadcast; this one keeps running meanwhile. */
+  onWatch?: () => void;
   /** The captured source went away on its own (window closed). */
   onSourceEnded: () => void;
   /** Start over with a fresh session (after the signaling server failed). */
@@ -30,7 +32,7 @@ function encoderSettingsFor(quality: StreamQuality) {
   return { degradationPreference, bitrateScale };
 }
 
-export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChange }: LiveProps) {
+export function Live({ broadcast, onStop, onWatch, onSourceEnded, onRetry, onQualityChange }: LiveProps) {
   const { t } = useI18n();
   const platform = usePlatform();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -239,7 +241,12 @@ export function Live({ broadcast, onStop, onSourceEnded, onRetry, onQualityChang
             )}
           </section>
 
-          <Button variant="danger" onClick={onStop} className={styles.stop}>
+          {onWatch && (
+            <Button variant="secondary" onClick={onWatch} className={styles.sideAction}>
+              <WatchIcon /> {t.live.watchOther}
+            </Button>
+          )}
+          <Button variant="danger" onClick={onStop} className={styles.sideAction}>
             {t.live.stop}
           </Button>
         </aside>
