@@ -124,6 +124,17 @@ describe("navReducer", () => {
     expect(deriveView(state).notice).toEqual({ kind: "source-ended" });
   });
 
+  it("stays put when the shared window closes away from the broadcast's screens", () => {
+    const state = run(...onAir, { type: "go", screen: "home" }, { type: "source-ended" });
+    expect(state).toMatchObject({ screen: "home", onAir: null });
+    expect(deriveView(state).notice).toBeUndefined();
+  });
+
+  it("ignores late news from a watch already left", () => {
+    const state = run(...onAir, { type: "go", screen: "watch" });
+    expect(navReducer(state, { type: "viewer-ended", reason: "ended" })).toBe(state);
+  });
+
   it("goes to the picker after stopping", () => {
     expect(run(...onAir, { type: "stopped" })).toMatchObject({ screen: "pick", onAir: null });
   });

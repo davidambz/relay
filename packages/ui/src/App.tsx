@@ -15,11 +15,34 @@ import { SourcePicker, type StartedBroadcast } from "./screens/SourcePicker";
 import { Viewing } from "./screens/Viewing";
 import { Watch } from "./screens/Watch";
 import type { ViewerEndReason } from "@relay/core";
+import type { Strings } from "./i18n/strings";
 import { canGoBack, deriveView, initialNav, navReducer, type Notice, type Screen } from "./navigation";
 import styles from "./App.module.css";
 
 function stopStream(stream: MediaStream) {
   for (const track of stream.getTracks()) track.stop();
+}
+
+function noticeText(notice: Notice | undefined, t: Strings): string | undefined {
+  if (!notice) return undefined;
+  switch (notice.kind) {
+    case "source-ended":
+      return t.live.sourceEnded;
+    case "watched-ended":
+      return t.live.watchedEnded;
+    case "viewer-ended":
+      return {
+        ended: t.watch.ended,
+        full: t.watch.full,
+        "not-found": t.watch.notFound,
+        timeout: t.watch.timeout,
+        network: t.watch.network,
+      }[notice.reason];
+    default: {
+      const unhandled: never = notice;
+      return unhandled;
+    }
+  }
 }
 
 export function App() {
@@ -83,27 +106,19 @@ export function App() {
 
   const go = useCallback((target: Screen) => dispatch({ type: "go", screen: target }), []);
 
-  const handleSourceEnded = useCallback(() => {
-    if (onAir) stopStream(onAir.broadcast.stream);
-    dispatch({ type: "source-ended" });
-  }, [onAir]);
+  // The capture stops when its broadcast ends, however it ends (stop,
+  // shared window closed, app closing); a retry keeps the same stream.
+  const liveStream = onAir?.broadcast.stream ?? null;
+  useEffect(() => {
+    if (!liveStream) return;
+    return () => stopStream(liveStream);
+  }, [liveStream]);
+
+  const handleSourceEnded = useCallback(() => dispatch({ type: "source-ended" }), []);
 
   const handleViewerEnded = useCallback((reason: ViewerEndReason) => dispatch({ type: "viewer-ended", reason }), []);
 
-  function noticeText(notice: Notice | undefined): string | undefined {
-    if (!notice) return undefined;
-    if (notice.kind === "source-ended") return t.live.sourceEnded;
-    if (notice.kind === "watched-ended") return t.live.watchedEnded;
-    const viewerNotices: Record<typeof notice.reason, string> = {
-      ended: t.watch.ended,
-      full: t.watch.full,
-      "not-found": t.watch.notFound,
-      timeout: t.watch.timeout,
-      network: t.watch.network,
-    };
-    return viewerNotices[notice.reason];
-  }
-  const notice = noticeText(view.notice);
+  const notice = noticeText(view.notice, t);
 
   return (
     <div className={styles.app}>
@@ -135,10 +150,7 @@ export function App() {
               // A new key remounts Live, which starts a fresh host session.
               key={onAir.attempt}
               broadcast={onAir.broadcast}
-              onStop={() => {
-                stopStream(onAir.broadcast.stream);
-                dispatch({ type: "stopped" });
-              }}
+              onStop={() => dispatch({ type: "stopped" })}
               onWatch={view.canWatchFromLive ? () => go("watch") : undefined}
               onSourceEnded={handleSourceEnded}
               onRetry={() => dispatch({ type: "retry" })}

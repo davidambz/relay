@@ -5,7 +5,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { PlatformContext } from "../platform/PlatformContext";
 import { fakePlatform } from "../test/fakePlatform";
-import { Header, type HeaderStatus } from "./Header";
+import type { HeaderStatus } from "../navigation";
+import { Header } from "./Header";
 
 function renderHeader(status: HeaderStatus, onReturnToLive?: () => void) {
   return render(

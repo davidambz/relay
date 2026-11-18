@@ -4,10 +4,8 @@
 import { useI18n } from "../i18n/I18nContext";
 import { BroadcastIcon, RelayMark, WatchIcon } from "./icons";
 import { Segmented } from "./Segmented";
+import type { HeaderStatus, HeaderView } from "../navigation";
 import styles from "./Header.module.css";
-
-export type HeaderStatus = "idle" | "live" | "watching" | "live-watching";
-export type HeaderView = "live" | "watching";
 
 interface HeaderProps {
   status: HeaderStatus;

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type { SessionKind, ViewerEndReason } from "@relay/core";
-import type { HeaderStatus, HeaderView } from "./components/Header";
 
 // Which screen is up, and the two sessions that outlive it. Pure, so every
 // combination of "on air" and "watching" is decided (and tested) here
@@ -14,6 +13,11 @@ import type { HeaderStatus, HeaderView } from "./components/Header";
 // the broadcast ends, the player comes back up).
 
 export type Screen = "home" | "pick" | "live" | "watch" | "viewing";
+
+/** The header's status readout. */
+export type HeaderStatus = "idle" | "live" | "watching" | "live-watching";
+/** Both sessions running: which one is on screen. */
+export type HeaderView = "live" | "watching";
 
 /** Why a screen is showing a note; App turns it into text. */
 export type Notice =
@@ -81,7 +85,9 @@ export function navReducer<B>(state: NavState<B>, action: NavAction<B>): NavStat
       const next = { ...state, onAir: null };
       // Watching something meanwhile? That's where they land.
       if (state.watching) return state.screen === "viewing" ? next : show(next, "viewing");
-      return show(next, "pick", { kind: "source-ended" });
+      // From the broadcast's screens, to the picker with why; elsewhere, stay.
+      if (state.screen === "live" || state.screen === "watch") return show(next, "pick", { kind: "source-ended" });
+      return next;
     }
     case "watch":
       if (state.watching) return state;
@@ -89,6 +95,8 @@ export function navReducer<B>(state: NavState<B>, action: NavAction<B>): NavStat
     case "left":
       return show({ ...state, watching: null }, "watch");
     case "viewer-ended": {
+      // Late news from a session already left: nothing to update.
+      if (!state.watching) return state;
       const next = { ...state, watching: null };
       if (state.screen === "viewing") {
         return show(next, "watch", action.reason === "left" ? undefined : { kind: "viewer-ended", reason: action.reason });
@@ -104,8 +112,8 @@ export function navReducer<B>(state: NavState<B>, action: NavAction<B>): NavStat
 }
 
 /** Whether back has somewhere to go in the app (else it leaves the app). */
-export function canGoBack(state: NavState<unknown>): boolean {
-  return state.screen === "viewing" || state.screen === "watch" || state.screen === "pick";
+export function canGoBack<B>(state: NavState<B>): boolean {
+  return navReducer(state, { type: "back" }) !== state;
 }
 
 export interface NavView {
