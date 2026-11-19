@@ -10,12 +10,15 @@ windows a person would consider open.
 
 ```
 winlist [--all]
+winlist --watch-foreground [--ignore-pid N]
 ```
 
 | Option | Meaning |
 | --- | --- |
 | (none) | Print the Alt+Tab-eligible windows. |
 | `--all` | Print every top-level window with the computed flags and the rule that rejected it. For debugging. |
+| `--watch-foreground` | Keep running and print a line whenever the foreground window or its fullscreen state changes (see below). Exits when stdin closes. |
+| `--ignore-pid N` | With `--watch-foreground`: windows of process N never count as fullscreen (Relay passes its own pid). |
 
 ### Output
 
@@ -36,6 +39,24 @@ With `--all` each entry also has `class`, `style`, `exstyle`, `rect`, `iconic`,
 `visible`, `cloaked` (raw `DWMWA_CLOAKED` value), `toolwindow`, `noactivate`,
 `appwindow`, `owner` (`GW_OWNER`, decimal), `ownerChainOk`, `eligible` and
 `reason` (first rule that failed, `""` when eligible).
+
+### Watching the foreground
+
+Relay keeps its mini player out of the way of fullscreen games with this
+mode: while it's open, the app runs `winlist --watch-foreground` and reads
+one JSON line per change (polled every 200 ms):
+
+```
+{"hwnd":526678,"pid":13624,"fullscreen":true,"monitor":[-1920,0,0,1080]}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `hwnd`, `pid` | The foreground window and its process. |
+| `fullscreen` | Its rect covers its whole monitor: exclusive or borderless fullscreen. Never for the desktop, the taskbar, minimized windows or maximized windows with a title bar. |
+| `monitor` | That monitor's rect, `[left, top, right, bottom]` in physical pixels (the watcher is per-monitor DPI aware). |
+
+The process exits when its stdin closes, which also happens when the parent dies.
 
 ### Eligibility rules
 

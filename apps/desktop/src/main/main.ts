@@ -12,6 +12,7 @@ import { hwndFromSourceId, listOpenWindows } from "./windowList";
 import { isAudioAvailable, startAudio, stopAllAudio, stopAudio } from "./audio";
 import { applyUpdate, checkForUpdate, getUpdateStatus, installOnQuit, scheduleUpdateChecks, setSessionActive } from "./updater";
 import { createTray, type RelayTray } from "./tray";
+import { watchForeground, type ForegroundState } from "./foregroundWatch";
 
 // null: an installed Relay is already running; it gets "second-instance"
 // and shows itself, and this copy just quits.
@@ -225,14 +226,15 @@ function createWindow() {
     if (details.frameName !== FLOATING_WINDOW_NAME) return;
     floatingWindow = child;
     child.setAspectRatio(16 / 9);
-    child.setAlwaysOnTop(true, "floating");
+    // The highest level there is: above borderless-fullscreen games too.
+    child.setAlwaysOnTop(true, "screen-saver");
     child.setMenu(null);
     // The mini player replaces the main window until it closes.
     window.hide();
-    const stopHoverTracking = trackFloatingHover(child, window);
+    const stopManaging = manageFloating(child, window);
     child.on("closed", () => {
       if (floatingWindow === child) floatingWindow = null;
-      stopHoverTracking();
+      stopManaging();
       if (!window.isDestroyed()) window.show();
     });
   });
@@ -260,28 +262,75 @@ function createWindow() {
 const FLOATING_WINDOW_NAME = "relay-floating";
 const HOVER_POLL_MS = 100;
 
+const KEEP_ON_TOP_MS = 2000;
+
 /**
- * Tells the page whether the mouse is over the mini player, so its
- * controls show exactly while hovered. Polled from here because Windows
- * delivers no mouse events to the page over the drag grip (it's the
- * frameless window's title bar), so the page would see the mouse "leave"
- * as soon as it reached the grip. The mini player's React tree lives in
- * the main window's renderer (window.open portal), so that's who hears it.
+ * Keeps the mini player on top of everything, out of the way of fullscreen
+ * games, and tells its page when the mouse is over it.
+ *
+ * - On top: a fullscreen game taking the foreground lands above other
+ *   topmost windows, so the mini player is raised again on every switch of
+ *   foreground window (and every few seconds, in case one goes unseen).
+ * - Out of the way: while a fullscreen window is in the foreground on the
+ *   mini player's monitor, the mini player lets the mouse through (clicks
+ *   reach the game, which keeps its focus) and shows no controls. Leaving
+ *   the game (Alt+Tab, the desktop) makes it interactive again.
+ * - Hover is polled from here because Windows delivers no mouse events to
+ *   the page over the drag grip (it's the frameless window's title bar).
+ *   The mini player's React tree lives in the main window's renderer
+ *   (window.open portal), so that's who hears it.
  */
-function trackFloatingHover(child: BrowserWindow, owner: BrowserWindow): () => void {
+function manageFloating(child: BrowserWindow, owner: BrowserWindow): () => void {
   let hovered: boolean | null = null;
-  const timer = setInterval(() => {
+  let passThrough = false;
+  let foreground: ForegroundState | null = null;
+
+  const raise = () => {
+    if (child.isDestroyed()) return;
+    child.setAlwaysOnTop(true, "screen-saver");
+    child.moveTop();
+  };
+
+  const updatePassThrough = () => {
+    if (child.isDestroyed()) return;
+    const next = foreground !== null && foreground.fullscreen && sameDisplay(child, foreground.monitor);
+    if (next === passThrough) return;
+    passThrough = next;
+    child.setIgnoreMouseEvents(next);
+  };
+
+  const hoverTimer = setInterval(() => {
     if (child.isDestroyed() || owner.isDestroyed()) return;
     const { x, y } = screen.getCursorScreenPoint();
     const bounds = child.getBounds();
-    const inside = x >= bounds.x && x < bounds.x + bounds.width && y >= bounds.y && y < bounds.y + bounds.height;
+    const over = x >= bounds.x && x < bounds.x + bounds.width && y >= bounds.y && y < bounds.y + bounds.height;
+    const inside = over && !passThrough;
     if (inside !== hovered) {
       hovered = inside;
       owner.webContents.send(IPC.floatingHover, inside);
     }
   }, HOVER_POLL_MS);
-  return () => clearInterval(timer);
+  const raiseTimer = setInterval(raise, KEEP_ON_TOP_MS);
+  const stopWatching = watchForeground((state) => {
+    foreground = state;
+    raise();
+    updatePassThrough();
+  });
+  child.on("moved", updatePassThrough);
+
+  return () => {
+    clearInterval(hoverTimer);
+    clearInterval(raiseTimer);
+    stopWatching?.();
+  };
 }
+
+/** Whether the window is on the monitor given in physical pixels. */
+function sameDisplay(window: BrowserWindow, [left, top, right, bottom]: ForegroundState["monitor"]): boolean {
+  const monitor = screen.screenToDipRect(null, { x: left, y: top, width: right - left, height: bottom - top });
+  return screen.getDisplayMatching(monitor).id === screen.getDisplayMatching(window.getBounds()).id;
+}
+
 const FLOATING_SIZE = { width: 480, height: 270 };
 const FLOATING_MARGIN = 24;
 

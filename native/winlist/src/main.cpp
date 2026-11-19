@@ -28,6 +28,7 @@
 #include <cwchar>
 #include <string>
 
+#include "foreground.h"
 #include "json_writer.h"
 #include "window_list.h"
 
@@ -35,14 +36,24 @@ namespace {
 
 constexpr int kExitOk = 0;
 constexpr int kExitUsage = 2;
+// Fast enough that the mini player stops catching the mouse right as a
+// game takes over, cheap enough to run for as long as it's open.
+constexpr DWORD kForegroundPollMs = 200;
 
 void PrintUsage() {
     fputs(
         "usage: winlist [--all]\n"
+        "       winlist --watch-foreground [--ignore-pid N]\n"
         "\n"
         "  (no flags)  print the Alt+Tab windows as a JSON array:\n"
         "              [{\"hwnd\":N,\"pid\":N,\"exe\":\"...\",\"title\":\"...\"}, ...]\n"
-        "  --all       print every top-level window with the computed flags\n",
+        "  --all       print every top-level window with the computed flags\n"
+        "  --watch-foreground\n"
+        "              keep running; print a JSON line whenever the foreground\n"
+        "              window or its fullscreen state changes, until stdin closes:\n"
+        "              {\"hwnd\":N,\"pid\":N,\"fullscreen\":B,\"monitor\":[l,t,r,b]}\n"
+        "  --ignore-pid N\n"
+        "              with --watch-foreground: N's windows never count as fullscreen\n",
         stderr);
 }
 
@@ -99,9 +110,15 @@ void AppendWindow(std::string& out, const relay::WindowInfo& w, bool all) {
 
 int wmain(int argc, wchar_t** argv) {
     bool all = false;
+    bool watch = false;
+    DWORD ignore_pid = 0;
     for (int i = 1; i < argc; ++i) {
         if (wcscmp(argv[i], L"--all") == 0) {
             all = true;
+        } else if (wcscmp(argv[i], L"--watch-foreground") == 0) {
+            watch = true;
+        } else if (wcscmp(argv[i], L"--ignore-pid") == 0 && i + 1 < argc) {
+            ignore_pid = static_cast<DWORD>(wcstoul(argv[++i], nullptr, 10));
         } else if (wcscmp(argv[i], L"--help") == 0 || wcscmp(argv[i], L"-h") == 0) {
             PrintUsage();
             return kExitOk;
@@ -110,6 +127,10 @@ int wmain(int argc, wchar_t** argv) {
             PrintUsage();
             return kExitUsage;
         }
+    }
+
+    if (watch) {
+        return relay::WatchForeground(ignore_pid, kForegroundPollMs);
     }
 
     std::string out = "[";
