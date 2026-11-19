@@ -226,7 +226,9 @@ function createWindow() {
     if (details.frameName !== FLOATING_WINDOW_NAME) return;
     floatingWindow = child;
     child.setAspectRatio(16 / 9);
-    // The highest level there is: above borderless-fullscreen games too.
+    // Every level is HWND_TOPMOST on Windows; "screen-saver" also goes
+    // above the taskbar. Staying above fullscreen games is manageFloating's
+    // job (it raises the window whenever the foreground changes).
     child.setAlwaysOnTop(true, "screen-saver");
     child.setMenu(null);
     // The mini player replaces the main window until it closes.
@@ -262,15 +264,13 @@ function createWindow() {
 const FLOATING_WINDOW_NAME = "relay-floating";
 const HOVER_POLL_MS = 100;
 
-const KEEP_ON_TOP_MS = 2000;
-
 /**
  * Keeps the mini player on top of everything, out of the way of fullscreen
  * games, and tells its page when the mouse is over it.
  *
  * - On top: a fullscreen game taking the foreground lands above other
- *   topmost windows, so the mini player is raised again on every switch of
- *   foreground window (and every few seconds, in case one goes unseen).
+ *   topmost windows, so the mini player is raised again whenever the
+ *   foreground window changes.
  * - Out of the way: while a fullscreen window is in the foreground on the
  *   mini player's monitor, the mini player lets the mouse through (clicks
  *   reach the game, which keeps its focus) and shows no controls. Leaving
@@ -285,10 +285,13 @@ function manageFloating(child: BrowserWindow, owner: BrowserWindow): () => void 
   let passThrough = false;
   let foreground: ForegroundState | null = null;
 
+  // Re-entering the topmost band puts it back at the top of it. Not
+  // moveTop: on Windows that re-applies position and size too, which can
+  // nudge the window under display scaling or fight a drag in progress.
   const raise = () => {
     if (child.isDestroyed()) return;
+    child.setAlwaysOnTop(false);
     child.setAlwaysOnTop(true, "screen-saver");
-    child.moveTop();
   };
 
   const updatePassThrough = () => {
@@ -310,17 +313,22 @@ function manageFloating(child: BrowserWindow, owner: BrowserWindow): () => void 
       owner.webContents.send(IPC.floatingHover, inside);
     }
   }, HOVER_POLL_MS);
-  const raiseTimer = setInterval(raise, KEEP_ON_TOP_MS);
-  const stopWatching = watchForeground((state) => {
-    foreground = state;
-    raise();
-    updatePassThrough();
-  });
+  const stopWatching = watchForeground(
+    (state) => {
+      foreground = state;
+      raise();
+      updatePassThrough();
+    },
+    // No more news: never leave the mini player stuck letting clicks through.
+    () => {
+      foreground = null;
+      updatePassThrough();
+    },
+  );
   child.on("moved", updatePassThrough);
 
   return () => {
     clearInterval(hoverTimer);
-    clearInterval(raiseTimer);
     stopWatching?.();
   };
 }

@@ -44,7 +44,8 @@ With `--all` each entry also has `class`, `style`, `exstyle`, `rect`, `iconic`,
 
 Relay keeps its mini player out of the way of fullscreen games with this
 mode: while it's open, the app runs `winlist --watch-foreground` and reads
-one JSON line per change (polled every 200 ms):
+one JSON line per change of foreground window, of its monitor, or of its
+fullscreen state (polled every 200 ms):
 
 ```
 {"hwnd":526678,"pid":13624,"fullscreen":true,"monitor":[-1920,0,0,1080]}
@@ -53,7 +54,7 @@ one JSON line per change (polled every 200 ms):
 | Field | Meaning |
 | --- | --- |
 | `hwnd`, `pid` | The foreground window and its process. |
-| `fullscreen` | Its rect covers its whole monitor: exclusive or borderless fullscreen. Never for the desktop, the taskbar, minimized windows or maximized windows with a title bar. |
+| `fullscreen` | Its rect covers its whole monitor: exclusive or borderless fullscreen. Never for the desktop, the taskbar, minimized windows or maximized resizable windows (`WS_THICKFRAME`, custom title bars included). |
 | `monitor` | That monitor's rect, `[left, top, right, bottom]` in physical pixels (the watcher is per-monitor DPI aware). |
 
 The process exits when its stdin closes, which also happens when the parent dies.

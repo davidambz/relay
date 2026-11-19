@@ -20,11 +20,15 @@ function isForegroundState(value: unknown): value is ForegroundState {
 
 /**
  * Follows the foreground window with native/winlist --watch-foreground:
- * `onChange` hears every switch of foreground window. Relay's own windows
- * never count as fullscreen. Returns a stop function; null when the
- * helper is missing (nothing to watch with).
+ * `onChange` hears every switch of foreground window or of its monitor or
+ * fullscreen state. Relay's own windows never count as fullscreen. If the
+ * helper exits early, `onLost` fires, so nothing stays stuck on its last
+ * report. Returns a stop function; null when the helper is missing.
  */
-export function watchForeground(onChange: (state: ForegroundState) => void): (() => void) | null {
+export function watchForeground(
+  onChange: (state: ForegroundState) => void,
+  onLost: () => void,
+): (() => void) | null {
   const exe = resolveNativeTool("winlist");
   if (!exe) {
     console.warn("winlist.exe not found; the mini player won't step aside for fullscreen games");
@@ -34,7 +38,15 @@ export function watchForeground(onChange: (state: ForegroundState) => void): (()
     stdio: ["pipe", "pipe", "ignore"],
     windowsHide: true,
   });
+  let stopping = false;
   child.on("error", (error) => console.warn("winlist --watch-foreground failed", error.message));
+  child.on("exit", (code) => {
+    if (stopping) return;
+    console.warn(`winlist --watch-foreground exited (${code})`);
+    onLost();
+  });
+  // Writing to (or ending) a pipe whose process is gone errors; nothing to do then.
+  child.stdin.on("error", () => {});
   createInterface({ input: child.stdout }).on("line", (line) => {
     try {
       const parsed: unknown = JSON.parse(line);
@@ -45,6 +57,8 @@ export function watchForeground(onChange: (state: ForegroundState) => void): (()
   });
   // Closing its stdin is how the helper is told to exit.
   return () => {
+    stopping = true;
+    if (child.exitCode !== null || child.killed) return;
     child.stdin.end();
     setTimeout(() => {
       if (child.exitCode === null) child.kill();

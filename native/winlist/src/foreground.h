@@ -31,7 +31,8 @@ struct ForegroundInfo {
 
 ForegroundInfo QueryForeground();
 
-// Prints one JSON line per change of foreground window or fullscreen state,
+// Prints one JSON line per change of foreground window, its monitor or its
+// fullscreen state,
 // polling every `interval_ms`, until stdin closes (the parent went away).
 // Windows of `ignore_pid` (the caller) never count as fullscreen.
 int WatchForeground(DWORD ignore_pid, DWORD interval_ms);

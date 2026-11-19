@@ -66,10 +66,11 @@ ForegroundInfo QueryForeground() {
     if (IsShellWindow(info.hwnd) || IsIconic(info.hwnd) || !GetWindowRect(info.hwnd, &rect)) {
         return info;
     }
-    // A maximized window with a title bar isn't fullscreen, even when the
-    // taskbar auto-hides and it spans the whole monitor.
+    // A maximized app isn't fullscreen, even where no taskbar is in the way
+    // and it spans the whole monitor. Resizable frames (WS_THICKFRAME) give
+    // it away, custom title bars included; borderless games don't have one.
     const LONG style = GetWindowLongW(info.hwnd, GWL_STYLE);
-    if (IsZoomed(info.hwnd) && (style & WS_CAPTION) == WS_CAPTION) {
+    if (IsZoomed(info.hwnd) && (style & WS_THICKFRAME) != 0) {
         return info;
     }
     info.fullscreen = rect.left <= monitor.rcMonitor.left && rect.top <= monitor.rcMonitor.top &&
@@ -88,16 +89,21 @@ int WatchForeground(DWORD ignore_pid, DWORD interval_ms) {
 
     HWND last_hwnd = nullptr;
     bool last_fullscreen = false;
+    RECT last_monitor = {};
     bool first = true;
     for (;;) {
         ForegroundInfo info = QueryForeground();
         if (info.pid == ignore_pid) {
             info.fullscreen = false;
         }
-        if (first || info.hwnd != last_hwnd || info.fullscreen != last_fullscreen) {
+        // A change of monitor counts too: a fullscreen game moved to another
+        // screen keeps its hwnd and its fullscreen state.
+        if (first || info.hwnd != last_hwnd || info.fullscreen != last_fullscreen ||
+            !EqualRect(&info.monitor, &last_monitor)) {
             first = false;
             last_hwnd = info.hwnd;
             last_fullscreen = info.fullscreen;
+            last_monitor = info.monitor;
             char line[200];
             snprintf(line, sizeof(line),
                      "{\"hwnd\":%llu,\"pid\":%lu,\"fullscreen\":%s,\"monitor\":[%ld,%ld,%ld,%ld]}\n",
