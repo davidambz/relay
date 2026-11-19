@@ -57,6 +57,14 @@ export interface Strings {
   dialog: {
     close: string;
   };
+  /** Asked before stopping the broadcast from the stage. */
+  stopLive: {
+    title: string;
+    message: string;
+    detail: string;
+    confirm: string;
+    cancel: string;
+  };
   /** Asked when quitting the app (e.g. from the tray) mid-broadcast. */
   quitWhileLive: {
     title: string;

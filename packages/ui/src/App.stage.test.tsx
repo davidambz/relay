@@ -180,10 +180,19 @@ describe("the stage", () => {
     expect(mine.setSession).toHaveBeenLastCalledWith("broadcasting");
   });
 
-  it("stops the broadcast from the bar, back home once nothing runs", async () => {
+  it("stops the broadcast from the bar after confirming, back home once nothing runs", async () => {
     const { app, track, setSession } = renderApp(new FakeNetwork());
-    await goLive(app);
+    const code = await goLive(app);
+
+    // Cancel (or Esc) keeps it on air.
     fireEvent.click(app.getByRole("button", { name: "Stop broadcast" }));
+    fireEvent.click((await openDialog("Stop broadcast")).getByRole("button", { name: "Keep broadcasting" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(app.getByText(code)).toBeInTheDocument();
+    expect(track.stop).not.toHaveBeenCalled();
+
+    fireEvent.click(app.getByRole("button", { name: "Stop broadcast" }));
+    fireEvent.click((await openDialog("Stop broadcast")).getByRole("button", { name: "Stop broadcast" }));
     expect(track.stop).toHaveBeenCalled();
     expect(setSession).toHaveBeenLastCalledWith(null);
     expect(app.getByRole("status")).toHaveTextContent("Standby");

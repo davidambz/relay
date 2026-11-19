@@ -56,6 +56,13 @@ export const en: Strings = {
   dialog: {
     close: "Close",
   },
+  stopLive: {
+    title: "Stop broadcast",
+    message: "Stop your broadcast?",
+    detail: "Everyone watching will be disconnected. Going live again gives a new code.",
+    confirm: "Stop broadcast",
+    cancel: "Keep broadcasting",
+  },
   quitWhileLive: {
     title: "You're broadcasting",
     message: "Quit Relay and end the broadcast?",

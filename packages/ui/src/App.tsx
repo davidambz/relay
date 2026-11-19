@@ -55,6 +55,8 @@ type OpenDialog =
   | { kind: "go-live" }
   | { kind: "switch-source" }
   | { kind: "settings" }
+  /** Confirming Stop: ending it disconnects everyone watching. */
+  | { kind: "stop" }
   /** `pending`: the code just submitted, while it connects. */
   | { kind: "watch"; pending?: string; error?: string };
 
@@ -177,7 +179,7 @@ export function App() {
             onDismissNotice={() => dispatch({ type: "dismiss-notice" })}
             onFocus={(tile) => dispatch({ type: "focus", tile })}
             onLeave={(code) => dispatch({ type: "left", code })}
-            onStop={() => dispatch({ type: "stopped" })}
+            onStop={() => setDialog({ kind: "stop" })}
             onRetry={() => dispatch({ type: "retry" })}
             onAddWatch={() => setDialog({ kind: "watch" })}
             onGoLive={canHost ? () => setDialog({ kind: "go-live" }) : undefined}
@@ -228,6 +230,32 @@ export function App() {
             dispatch({ type: "watch", code });
           }}
         />
+      )}
+
+      {dialog?.kind === "stop" && broadcast && (
+        <Dialog
+          title={t.stopLive.title}
+          onClose={closeDialog}
+          footer={
+            <>
+              <Button variant="secondary" onClick={closeDialog}>
+                {t.stopLive.cancel}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  setDialog(null);
+                  dispatch({ type: "stopped" });
+                }}
+              >
+                {t.stopLive.confirm}
+              </Button>
+            </>
+          }
+        >
+          <p className={styles.quitMessage}>{t.stopLive.message}</p>
+          <p className={styles.quitDetail}>{t.stopLive.detail}</p>
+        </Dialog>
       )}
 
       {quitPrompt && (

@@ -56,6 +56,13 @@ export const ptBR: Strings = {
   dialog: {
     close: "Fechar",
   },
+  stopLive: {
+    title: "Parar transmissão",
+    message: "Parar a sua transmissão?",
+    detail: "Quem está assistindo vai ser desconectado. Se entrar ao vivo de novo, o código muda.",
+    confirm: "Parar transmissão",
+    cancel: "Continuar transmitindo",
+  },
   quitWhileLive: {
     title: "Você está transmitindo",
     message: "Sair do Relay e encerrar a transmissão?",
