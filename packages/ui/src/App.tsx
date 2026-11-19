@@ -2,42 +2,47 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import type { ViewerEndReason } from "@relay/core";
 import { Button } from "./components/Button";
 import { Dialog } from "./components/Dialog";
 import { Header } from "./components/Header";
+import { BroadcastSettingsDialog } from "./dialogs/BroadcastSettingsDialog";
+import { GoLiveDialog } from "./dialogs/GoLiveDialog";
+import { WatchDialog } from "./dialogs/WatchDialog";
 import { useI18n } from "./i18n/I18nContext";
 import { usePlatform } from "./platform/PlatformContext";
 import { useSystemTheme } from "./hooks/useSystemTheme";
 import { useStreamQuality } from "./hooks/useStreamQuality";
+import { useVolumes } from "./player/useVolume";
 import { Home } from "./screens/Home";
-import { Live } from "./screens/Live";
-import { SourcePicker, type StartedBroadcast } from "./screens/SourcePicker";
-import { Viewing } from "./screens/Viewing";
-import { Watch } from "./screens/Watch";
-import type { ViewerEndReason } from "@relay/core";
+import { useBroadcast, type StartedBroadcast } from "./session/useBroadcast";
+import { useViewerSessions } from "./session/useViewerSessions";
+import { Stage } from "./stage/Stage";
 import type { Strings } from "./i18n/strings";
-import { canGoBack, deriveView, initialNav, navReducer, type Notice, type Screen } from "./navigation";
+import { canGoBack, deriveView, initialNav, navReducer, type Notice } from "./navigation";
 import styles from "./App.module.css";
 
 function stopStream(stream: MediaStream) {
   for (const track of stream.getTracks()) track.stop();
 }
 
+function endReasonText(reason: Exclude<ViewerEndReason, "left">, t: Strings): string {
+  return {
+    ended: t.watch.ended,
+    full: t.watch.full,
+    "not-found": t.watch.notFound,
+    timeout: t.watch.timeout,
+    network: t.watch.network,
+  }[reason];
+}
+
 function noticeText(notice: Notice | undefined, t: Strings): string | undefined {
   if (!notice) return undefined;
   switch (notice.kind) {
     case "source-ended":
-      return t.live.sourceEnded;
-    case "watched-ended":
-      return t.live.watchedEnded;
+      return t.stage.sourceEnded;
     case "viewer-ended":
-      return {
-        ended: t.watch.ended,
-        full: t.watch.full,
-        "not-found": t.watch.notFound,
-        timeout: t.watch.timeout,
-        network: t.watch.network,
-      }[notice.reason];
+      return t.stage.viewerEnded(notice.code, endReasonText(notice.reason, t));
     default: {
       const unhandled: never = notice;
       return unhandled;
@@ -45,23 +50,46 @@ function noticeText(notice: Notice | undefined, t: Strings): string | undefined 
   }
 }
 
+/** A dialog over the home screen or the stage. */
+type OpenDialog =
+  | { kind: "go-live" }
+  | { kind: "switch-source" }
+  | { kind: "settings" }
+  /** Confirming Stop: ending it disconnects everyone watching. */
+  | { kind: "stop" }
+  /** Confirming leaving a watched broadcast. */
+  | { kind: "leave"; code: string }
+  /** `pending`: the code just submitted, while it connects. */
+  | { kind: "watch"; pending?: string; error?: string };
+
 export function App() {
   useSystemTheme();
   const { t } = useI18n();
-  // Screens and sessions: see navigation.ts for the rules.
+  // Sessions and the tile in focus: see navigation.ts for the rules.
   const [nav, dispatch] = useReducer(navReducer<StartedBroadcast>, undefined, initialNav<StartedBroadcast>);
   const view = deriveView(nav);
-  const { screen, onAir, watching } = nav;
+  const [dialog, setDialog] = useState<OpenDialog | null>(null);
   // Read by the Android back handler, which is registered once.
   const navRef = useRef(nav);
+  const dialogRef = useRef(dialog);
   useLayoutEffect(() => {
     navRef.current = nav;
-  }, [nav]);
-  /** The broadcast's share code once it's up, so Watch can refuse it. */
-  const [liveCode, setLiveCode] = useState<string | null>(null);
+    dialogRef.current = dialog;
+  }, [nav, dialog]);
   const [, rememberQuality] = useStreamQuality();
   const platform = usePlatform();
-  const onPlayer = screen === "viewing";
+  const volumes = useVolumes(nav.watching);
+
+  const handleSourceEnded = useCallback(() => dispatch({ type: "source-ended" }), []);
+  const [broadcast, broadcastActions] = useBroadcast(nav.onAir, {
+    onSourceEnded: handleSourceEnded,
+    onQualityChange: rememberQuality,
+  });
+  const handleViewerEnded = useCallback(
+    (code: string, reason: ViewerEndReason) => dispatch({ type: "viewer-ended", code, reason }),
+    [],
+  );
+  const [viewers, viewerSessions] = useViewerSessions(nav.watching, handleViewerEnded);
 
   // Lets the shell hold back update restarts, light its tray, and so on.
   useEffect(() => {
@@ -88,101 +116,193 @@ export function App() {
   const [pictureInPicture, setPictureInPicture] = useState(false);
   useEffect(() => platform.onPictureInPictureChange?.(setPictureInPicture), [platform]);
 
-  // Android back: leave fullscreen first, then step back through the
-  // screens; at home, leave the app. A live broadcast isn't ended by
-  // back (only by Stop).
+  // Android back: close a dialog, leave fullscreen, then leave the watched
+  // broadcast in focus; otherwise, leave the app. A live broadcast isn't
+  // ended by back (only by Stop).
   useEffect(() => {
     if (!platform.onBackButton) return;
     return platform.onBackButton(() => {
+      if (dialogRef.current) {
+        setDialog(null);
+        return true;
+      }
       if (document.fullscreenElement) {
         void document.exitFullscreen().catch(() => {});
         return true;
       }
-      if (!canGoBack(navRef.current)) return false;
-      dispatch({ type: "back" });
+      // Back leaves the watched broadcast in focus, after confirming.
+      const { focus } = navRef.current;
+      if (!canGoBack(navRef.current) || focus === null) return false;
+      setDialog({ kind: "leave", code: focus });
       return true;
     });
   }, [platform]);
 
-  const go = useCallback((target: Screen) => dispatch({ type: "go", screen: target }), []);
-
   // The capture stops when its broadcast ends, however it ends (stop,
   // shared window closed, app closing); a retry keeps the same stream.
-  const liveStream = onAir?.broadcast.stream ?? null;
+  const liveStream = nav.onAir?.broadcast.stream ?? null;
   useEffect(() => {
     if (!liveStream) return;
     return () => stopStream(liveStream);
   }, [liveStream]);
 
-  const handleSourceEnded = useCallback(() => dispatch({ type: "source-ended" }), []);
+  // The watch dialog waits for the code it submitted: closes once it
+  // plays, or shows why it couldn't (instead of a note on the stage).
+  const pendingCode = dialog?.kind === "watch" ? dialog.pending : undefined;
+  const pendingState = pendingCode ? viewers[pendingCode] : undefined;
+  if (pendingCode && pendingState?.status === "playing") setDialog(null);
+  if (pendingCode && nav.notice?.kind === "viewer-ended" && nav.notice.code === pendingCode) {
+    setDialog({ kind: "watch", error: endReasonText(nav.notice.reason, t) });
+    dispatch({ type: "dismiss-notice" });
+  }
 
-  const handleViewerEnded = useCallback((reason: ViewerEndReason) => dispatch({ type: "viewer-ended", reason }), []);
+  // A dialog about something that went away meanwhile (the broadcast
+  // ended, the watched one dropped) has nothing left to act on.
+  const orphaned =
+    ((dialog?.kind === "switch-source" || dialog?.kind === "settings" || dialog?.kind === "stop") && !nav.onAir) ||
+    (dialog?.kind === "leave" && !nav.watching.includes(dialog.code));
+  if (orphaned) setDialog(null);
 
-  const notice = noticeText(view.notice, t);
+  const ownCode = broadcast?.host.status === "live" ? broadcast.host.code : undefined;
+  const notice = noticeText(nav.notice, t);
+  const canHost = platform.capabilities.host;
+  const closeDialog = () => setDialog(null);
+  // Dialogs live outside the stage; in fullscreen they'd open unseen.
+  const openDialog = (next: OpenDialog) => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    setDialog(next);
+  };
 
   return (
     <div className={styles.app}>
-      {!(pictureInPicture && onPlayer) && (
-        <Header
-          status={view.status}
-          view={
-            view.headerView && {
-              current: view.headerView,
-              onChange: (next) => go(next === "live" ? "live" : "viewing"),
-            }
-          }
-          onReturnToLive={view.returnToLive ? () => go("live") : undefined}
-        />
-      )}
-      <main className={styles.main}>
-        {screen === "home" && <Home live={onAir !== null} onBroadcast={() => go("pick")} onWatch={() => go("watch")} />}
-        {screen === "pick" && (
-          <SourcePicker
+      {viewerSessions}
+      {!(pictureInPicture && view.screen === "stage") && <Header status={view.status} />}
+      <main className={styles.main} data-screen={view.screen}>
+        {view.screen === "home" ? (
+          <Home
             notice={notice}
-            onBack={() => go("home")}
-            onStarted={(broadcast) => dispatch({ type: "started", broadcast })}
+            onBroadcast={() => setDialog({ kind: "go-live" })}
+            onWatch={() => setDialog({ kind: "watch" })}
           />
-        )}
-        {onAir && (
-          // Hidden, not unmounted, on other screens: unmounting ends the broadcast.
-          <div hidden={screen !== "live"} className={styles.sessionHolder}>
-            <Live
-              // A new key remounts Live, which starts a fresh host session.
-              key={onAir.attempt}
-              broadcast={onAir.broadcast}
-              onStop={() => dispatch({ type: "stopped" })}
-              onWatch={view.canWatchFromLive ? () => go("watch") : undefined}
-              onSourceEnded={handleSourceEnded}
-              onRetry={() => dispatch({ type: "retry" })}
-              onQualityChange={rememberQuality}
-              onCode={setLiveCode}
-              notice={screen === "live" ? notice : undefined}
-              active={screen === "live"}
-            />
-          </div>
-        )}
-        {screen === "watch" && (
-          <Watch
+        ) : (
+          <Stage
+            tiles={view.tiles}
+            focus={nav.focus}
+            broadcast={broadcast}
+            viewers={viewers}
+            volumes={volumes}
             notice={notice}
-            onBack={() => go("home")}
-            ownCode={onAir ? (liveCode ?? undefined) : undefined}
-            onWatch={(code) => dispatch({ type: "watch", code })}
+            onDismissNotice={() => dispatch({ type: "dismiss-notice" })}
+            onFocus={(tile) => dispatch({ type: "focus", tile })}
+            onLeave={(code) => openDialog({ kind: "leave", code })}
+            onStop={() => openDialog({ kind: "stop" })}
+            onRetry={() => dispatch({ type: "retry" })}
+            onAddWatch={() => openDialog({ kind: "watch" })}
+            onGoLive={canHost ? () => openDialog({ kind: "go-live" }) : undefined}
+            onSwitchSource={() => openDialog({ kind: "switch-source" })}
+            onSettings={() => openDialog({ kind: "settings" })}
+            onAudioChange={broadcastActions.setAudioOn}
+            pictureInPicture={pictureInPicture}
+            active={dialog === null && quitPrompt === null}
           />
-        )}
-        {watching !== null && (
-          // Hidden, not unmounted, on the broadcast's screen: it keeps playing.
-          <div hidden={!onPlayer} className={styles.sessionHolder}>
-            <Viewing
-              key={watching}
-              code={watching}
-              active={onPlayer}
-              pictureInPicture={pictureInPicture}
-              onLeave={() => dispatch({ type: "left" })}
-              onEnded={handleViewerEnded}
-            />
-          </div>
         )}
       </main>
+
+      {dialog?.kind === "go-live" && (
+        <GoLiveDialog
+          onClose={closeDialog}
+          onStarted={(started) => {
+            setDialog(null);
+            dispatch({ type: "started", broadcast: started });
+          }}
+        />
+      )}
+      {dialog?.kind === "switch-source" && broadcast && (
+        <GoLiveDialog
+          mode="switch"
+          audio={broadcast.hasAudio}
+          onClose={closeDialog}
+          onStarted={(next) => {
+            // Close this dialog only: another may have opened meanwhile.
+            void broadcastActions
+              .switchSource(next)
+              .then(() => setDialog((current) => (current?.kind === "switch-source" ? null : current)));
+          }}
+        />
+      )}
+      {dialog?.kind === "settings" && broadcast && (
+        <BroadcastSettingsDialog
+          broadcast={broadcast}
+          onClose={closeDialog}
+          onQualityChange={(quality) => void broadcastActions.changeQuality(quality)}
+          onAudioChange={broadcastActions.setAudioOn}
+        />
+      )}
+      {dialog?.kind === "watch" && (
+        <WatchDialog
+          ownCode={ownCode}
+          connecting={pendingCode !== undefined}
+          error={dialog.error}
+          onClose={closeDialog}
+          onWatch={(code) => {
+            setDialog({ kind: "watch", pending: code });
+            dispatch({ type: "watch", code });
+          }}
+        />
+      )}
+
+      {dialog?.kind === "stop" && broadcast && (
+        <Dialog
+          title={t.stopLive.title}
+          onClose={closeDialog}
+          footer={
+            <>
+              <Button variant="secondary" onClick={closeDialog}>
+                {t.stopLive.cancel}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  setDialog(null);
+                  dispatch({ type: "stopped" });
+                }}
+              >
+                {t.stopLive.confirm}
+              </Button>
+            </>
+          }
+        >
+          <p className={styles.quitMessage}>{t.stopLive.message}</p>
+          <p className={styles.quitDetail}>{t.stopLive.detail}</p>
+        </Dialog>
+      )}
+
+      {dialog?.kind === "leave" && (
+        <Dialog
+          title={t.leaveLive.title}
+          onClose={closeDialog}
+          footer={
+            <>
+              <Button variant="secondary" onClick={closeDialog}>
+                {t.leaveLive.cancel}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  setDialog(null);
+                  dispatch({ type: "left", code: dialog.code });
+                }}
+              >
+                {t.leaveLive.confirm}
+              </Button>
+            </>
+          }
+        >
+          <p className={styles.quitMessage}>{t.leaveLive.message(dialog.code)}</p>
+          <p className={styles.quitDetail}>{t.leaveLive.detail}</p>
+        </Dialog>
+      )}
+
       {quitPrompt && (
         <Dialog
           title={t.quitWhileLive.title}

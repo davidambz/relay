@@ -1,7 +1,7 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { canGoBack, deriveView, initialNav, navReducer, type NavAction, type NavState } from "./navigation";
+import { canGoBack, deriveView, initialNav, navReducer, SELF, type NavAction, type NavState } from "./navigation";
 
 type Nav = NavState<string>;
 
@@ -9,151 +9,117 @@ function run(...actions: NavAction<string>[]): Nav {
   return actions.reduce<Nav>(navReducer, initialNav<string>());
 }
 
-const onAir: NavAction<string>[] = [{ type: "go", screen: "pick" }, { type: "started", broadcast: "stream" }];
-const watchingAlone: NavAction<string>[] = [{ type: "go", screen: "watch" }, { type: "watch", code: "ABC234" }];
-const both: NavAction<string>[] = [...onAir, { type: "go", screen: "watch" }, { type: "watch", code: "ABC234" }];
+const goLive: NavAction<string> = { type: "started", broadcast: "stream" };
+const watch = (code: string): NavAction<string> => ({ type: "watch", code });
 
 describe("navReducer", () => {
   it("starts at home, idle", () => {
     const state = run();
-    expect(state.screen).toBe("home");
-    expect(deriveView(state)).toMatchObject({ status: "idle", session: null, returnToLive: false });
+    expect(state.focus).toBeNull();
+    expect(deriveView(state)).toEqual({ screen: "home", status: "idle", session: null, tiles: [] });
   });
 
-  it("goes on air from the picker", () => {
-    const state = run(...onAir);
-    expect(state).toMatchObject({ screen: "live", onAir: { broadcast: "stream", attempt: 0 } });
-    expect(deriveView(state)).toMatchObject({ status: "live", session: "broadcasting", canWatchFromLive: true });
+  it("goes on air onto the stage, focused on the person's own broadcast", () => {
+    const state = run(goLive);
+    expect(state).toMatchObject({ onAir: { broadcast: "stream", attempt: 0 }, focus: SELF });
+    expect(deriveView(state)).toEqual({ screen: "stage", status: "live", session: "broadcasting", tiles: [SELF] });
   });
 
-  it("sends the broadcast button back to the running broadcast", () => {
-    const state = run(...onAir, { type: "go", screen: "home" }, { type: "go", screen: "pick" });
-    expect(state.screen).toBe("live");
-  });
-
-  it("refuses screens whose session isn't running", () => {
-    expect(run({ type: "go", screen: "live" }).screen).toBe("home");
-    expect(run({ type: "go", screen: "viewing" }).screen).toBe("home");
-  });
-
-  it("leads back to the broadcast from other screens while on air", () => {
-    const state = run(...onAir, { type: "go", screen: "watch" });
-    expect(deriveView(state).returnToLive).toBe(true);
-    expect(navReducer(state, { type: "go", screen: "live" }).screen).toBe("live");
-  });
-
-  it("restarts the host session on retry", () => {
-    expect(run(...onAir, { type: "retry" }).onAir?.attempt).toBe(1);
-  });
-
-  describe("on air and watching", () => {
-    it("shows both, with the switch on the player", () => {
-      const state = run(...both);
-      expect(state).toMatchObject({ screen: "viewing", watching: "ABC234" });
-      expect(deriveView(state)).toMatchObject({
-        status: "live-watching",
-        session: "broadcasting",
-        headerView: "watching",
-        returnToLive: false,
-        canWatchFromLive: false,
-      });
-    });
-
-    it("switches between the two screens, keeping both sessions", () => {
-      const live = run(...both, { type: "go", screen: "live" });
-      expect(live).toMatchObject({ screen: "live", watching: "ABC234", onAir: { attempt: 0 } });
-      expect(deriveView(live).headerView).toBe("live");
-      expect(navReducer(live, { type: "go", screen: "viewing" }).screen).toBe("viewing");
-    });
-
-    it.each(["home", "pick", "watch"] as const)("refuses %s, which would strand the hidden player", (screen) => {
-      const state = run(...both, { type: "go", screen: "live" });
-      expect(navReducer(state, { type: "go", screen })).toBe(state);
-    });
-
-    it("lands on the player when the broadcast is stopped", () => {
-      const state = run(...both, { type: "go", screen: "live" }, { type: "stopped" });
-      expect(state).toMatchObject({ screen: "viewing", onAir: null, watching: "ABC234" });
-    });
-
-    it("lands on the player when the shared window closes", () => {
-      const fromLive = run(...both, { type: "go", screen: "live" }, { type: "source-ended" });
-      expect(fromLive).toMatchObject({ screen: "viewing", onAir: null });
-      const fromPlayer = run(...both, { type: "source-ended" });
-      expect(fromPlayer).toMatchObject({ screen: "viewing", onAir: null });
-      expect(deriveView(fromPlayer).status).toBe("watching");
-    });
-
-    it("says so on the broadcast's screen when the watched one ends there", () => {
-      const state = run(...both, { type: "go", screen: "live" }, { type: "viewer-ended", reason: "ended" });
-      expect(state).toMatchObject({ screen: "live", watching: null });
-      expect(deriveView(state)).toMatchObject({ notice: { kind: "watched-ended" }, headerView: undefined, status: "live" });
-      // The note goes away with the next navigation.
-      const later = navReducer(navReducer(state, { type: "go", screen: "watch" }), { type: "go", screen: "live" });
-      expect(deriveView(later).notice).toBeUndefined();
-    });
-
-    it("leaving the player keeps the broadcast", () => {
-      const state = run(...both, { type: "left" });
-      expect(state).toMatchObject({ screen: "watch", watching: null, onAir: { attempt: 0 } });
-      expect(deriveView(state).returnToLive).toBe(true);
+  it("watches several broadcasts, focusing the newest, own broadcast first in the tiles", () => {
+    const state = run(goLive, watch("ABC234"), watch("XYZ789"));
+    expect(state.focus).toBe("XYZ789");
+    expect(deriveView(state)).toMatchObject({
+      status: "live-watching",
+      session: "broadcasting",
+      tiles: [SELF, "ABC234", "XYZ789"],
     });
   });
 
-  describe("watching alone", () => {
-    it("goes back to the code screen with the reason when it ends", () => {
-      const state = run(...watchingAlone, { type: "viewer-ended", reason: "not-found" });
-      expect(state).toMatchObject({ screen: "watch", watching: null });
-      expect(deriveView(state).notice).toEqual({ kind: "viewer-ended", reason: "not-found" });
+  it("keeps a watched broadcast in focus when going live meanwhile", () => {
+    const state = run(watch("ABC234"), goLive);
+    expect(state.focus).toBe("ABC234");
+    expect(deriveView(state).tiles).toEqual([SELF, "ABC234"]);
+  });
+
+  it("brings an already watched code up instead of adding it twice", () => {
+    const state = run(watch("ABC234"), watch("XYZ789"), watch("ABC234"));
+    expect(state.watching).toEqual(["ABC234", "XYZ789"]);
+    expect(state.focus).toBe("ABC234");
+  });
+
+  it("focuses any tile on the stage, and nothing that isn't there", () => {
+    const state = run(goLive, watch("ABC234"), { type: "focus", tile: SELF });
+    expect(state.focus).toBe(SELF);
+    expect(navReducer(state, { type: "focus", tile: "NOPE23" })).toBe(state);
+    expect(navReducer(state, { type: "focus", tile: SELF })).toBe(state);
+  });
+
+  it("moves the focus to a watched broadcast when the focused one goes", () => {
+    const state = run(goLive, watch("ABC234"), watch("XYZ789"), { type: "left", code: "XYZ789" });
+    expect(state.focus).toBe("ABC234");
+    expect(run(goLive, watch("ABC234"), { type: "left", code: "ABC234" }).focus).toBe(SELF);
+  });
+
+  it("leaves the focus alone when another tile goes", () => {
+    const state = run(goLive, watch("ABC234"), watch("XYZ789"), { type: "left", code: "ABC234" });
+    expect(state.focus).toBe("XYZ789");
+  });
+
+  it("stays on the stage watching when the broadcast stops", () => {
+    const state = run(goLive, watch("ABC234"), { type: "focus", tile: SELF }, { type: "stopped" });
+    expect(state).toMatchObject({ onAir: null, focus: "ABC234" });
+    expect(deriveView(state)).toMatchObject({ screen: "stage", status: "watching", session: "watching" });
+  });
+
+  it("returns home when the last session ends", () => {
+    expect(deriveView(run(goLive, { type: "stopped" })).screen).toBe("home");
+    expect(deriveView(run(watch("ABC234"), { type: "left", code: "ABC234" })).screen).toBe("home");
+  });
+
+  it("says why when the shared window closes", () => {
+    const state = run(goLive, { type: "source-ended" });
+    expect(state).toMatchObject({ onAir: null, focus: null, notice: { kind: "source-ended" } });
+    expect(navReducer(state, { type: "dismiss-notice" }).notice).toBeUndefined();
+  });
+
+  it("drops a watched broadcast that ends, saying which and why", () => {
+    const state = run(goLive, watch("ABC234"), { type: "viewer-ended", code: "ABC234", reason: "not-found" });
+    expect(state).toMatchObject({
+      watching: [],
+      focus: SELF,
+      notice: { kind: "viewer-ended", code: "ABC234", reason: "not-found" },
     });
-
-    it("says nothing when the person left", () => {
-      const state = run(...watchingAlone, { type: "viewer-ended", reason: "left" });
-      expect(deriveView(state).notice).toBeUndefined();
-    });
-
-    it("can't wander off the player", () => {
-      const state = run(...watchingAlone);
-      expect(navReducer(state, { type: "go", screen: "home" })).toBe(state);
-    });
   });
 
-  it("goes to the picker with a note when the shared window closes", () => {
-    const state = run(...onAir, { type: "source-ended" });
-    expect(state).toMatchObject({ screen: "pick", onAir: null });
-    expect(deriveView(state).notice).toEqual({ kind: "source-ended" });
+  it("says nothing when the person left on their own", () => {
+    const state = run(watch("ABC234"), { type: "viewer-ended", code: "ABC234", reason: "left" });
+    expect(state.notice).toBeUndefined();
+    expect(deriveView(state).screen).toBe("home");
   });
 
-  it("stays put when the shared window closes away from the broadcast's screens", () => {
-    const state = run(...onAir, { type: "go", screen: "home" }, { type: "source-ended" });
-    expect(state).toMatchObject({ screen: "home", onAir: null });
-    expect(deriveView(state).notice).toBeUndefined();
+  it("ignores late news from a session already left", () => {
+    const state = run(watch("ABC234"), { type: "left", code: "ABC234" });
+    expect(navReducer(state, { type: "viewer-ended", code: "ABC234", reason: "ended" })).toBe(state);
   });
 
-  it("ignores late news from a watch already left", () => {
-    const state = run(...onAir, { type: "go", screen: "watch" });
-    expect(navReducer(state, { type: "viewer-ended", reason: "ended" })).toBe(state);
+  it("clears an old notice when something new starts", () => {
+    const ended = run(goLive, { type: "source-ended" });
+    expect(navReducer(ended, goLive).notice).toBeUndefined();
+    expect(navReducer(ended, watch("ABC234")).notice).toBeUndefined();
   });
 
-  it("goes to the picker after stopping", () => {
-    expect(run(...onAir, { type: "stopped" })).toMatchObject({ screen: "pick", onAir: null });
-  });
-});
-
-describe("back", () => {
-  it("steps back through the screens, leaving the player first", () => {
-    let state = run(...watchingAlone);
-    expect(canGoBack(state)).toBe(true);
-    state = navReducer(state, { type: "back" });
-    expect(state).toMatchObject({ screen: "watch", watching: null });
-    state = navReducer(state, { type: "back" });
-    expect(state.screen).toBe("home");
-    expect(canGoBack(state)).toBe(false);
+  it("bumps the attempt on retry, keeping the broadcast", () => {
+    const state = run(goLive, { type: "retry" });
+    expect(state.onAir).toEqual({ broadcast: "stream", attempt: 1 });
+    expect(navReducer(initialNav<string>(), { type: "retry" }).onAir).toBeNull();
   });
 
-  it("doesn't end a broadcast", () => {
-    const state = run(...onAir);
-    expect(canGoBack(state)).toBe(false);
-    expect(navReducer(state, { type: "back" })).toBe(state);
+  it("goes back by leaving the watched broadcast in focus, never by ending the broadcast", () => {
+    const watching = run(goLive, watch("ABC234"));
+    expect(canGoBack(watching)).toBe(true);
+    const back = navReducer(watching, { type: "back" });
+    expect(back).toMatchObject({ watching: [], focus: SELF });
+    expect(canGoBack(back)).toBe(false);
+    expect(canGoBack(run())).toBe(false);
   });
 });

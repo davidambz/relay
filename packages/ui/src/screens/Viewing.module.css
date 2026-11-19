@@ -1,4 +1,0 @@
-/* Fills the app's scroll region edge to edge: the player owns this screen. */
-.viewing {
-  height: 100%;
-}

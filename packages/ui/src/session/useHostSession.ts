@@ -1,12 +1,13 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HostSession, loadSessionConfig, type EncoderSettings } from "@relay/core";
 import { usePlatform } from "../platform/PlatformContext";
 import { usePeerFactory } from "./PeerFactoryContext";
 
 export type HostState =
+  | { status: "off" }
   | { status: "starting" }
   | { status: "live"; code: string; viewers: string[]; maxViewers?: number; signaling: boolean }
   | { status: "failed"; reason: string };
@@ -19,19 +20,36 @@ export interface HostControls {
 }
 
 /**
- * Runs a HostSession for as long as the component is mounted with this
- * stream. To retry after a failure, remount (change the component key).
+ * Runs a HostSession while there's a stream to broadcast, for as long as
+ * the component stays mounted. A new `attempt` starts a fresh session
+ * (the retry after a failure).
  */
-export function useHostSession(stream: MediaStream, encoder: EncoderSettings): [HostState, HostControls] {
+export function useHostSession(
+  stream: MediaStream | null,
+  encoder: EncoderSettings,
+  attempt = 0,
+): [HostState, HostControls] {
   const platform = usePlatform();
   const createPeer = usePeerFactory();
-  const [state, setState] = useState<HostState>({ status: "starting" });
+  const [state, setState] = useState<HostState>({ status: stream ? "starting" : "off" });
+  // A new stream or attempt starts over from "starting" (or "off"),
+  // adjusted during render rather than in the effect.
+  const [startedFor, setStartedFor] = useState({ stream, attempt });
+  if (startedFor.stream !== stream || startedFor.attempt !== attempt) {
+    setStartedFor({ stream, attempt });
+    setState({ status: stream ? "starting" : "off" });
+  }
   const sessionRef = useRef<HostSession | null>(null);
-  // Encoder settings at the time the session starts; later changes go
-  // through setEncoderSettings so they don't restart the broadcast.
-  const initialEncoder = useRef(encoder);
+  // The latest encoder settings, read when a session starts (a new stream
+  // or a retry). Changes mid-broadcast go through setEncoderSettings, so
+  // they don't restart it.
+  const latestEncoder = useRef(encoder);
+  useLayoutEffect(() => {
+    latestEncoder.current = encoder;
+  });
 
   useEffect(() => {
+    if (!stream) return;
     let disposed = false;
     let session: HostSession | null = null;
     const update = (next: (current: HostState) => HostState) => {
@@ -42,7 +60,7 @@ export function useHostSession(stream: MediaStream, encoder: EncoderSettings): [
       const config = await loadSessionConfig(platform.storage);
       if (disposed) return;
       session = new HostSession(stream, config, createPeer, {
-        ...initialEncoder.current,
+        ...latestEncoder.current,
         onViewersChange: (viewers) =>
           update((current) => (current.status === "live" ? { ...current, viewers } : current)),
         onSignalingChange: (signaling) =>
@@ -78,10 +96,9 @@ export function useHostSession(stream: MediaStream, encoder: EncoderSettings): [
       sessionRef.current = null;
       session?.stop();
     };
-  }, [stream, platform, createPeer]);
+  }, [stream, attempt, platform, createPeer]);
 
   const setEncoderSettings = useCallback((settings: EncoderSettings) => {
-    initialEncoder.current = { ...initialEncoder.current, ...settings };
     sessionRef.current?.setEncoderSettings(settings);
   }, []);
 

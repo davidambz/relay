@@ -12,29 +12,34 @@ import styles from "./Home.module.css";
 interface HomeProps {
   onBroadcast: () => void;
   onWatch: () => void;
-  /** A broadcast is running in the background (the person went to watch one). */
-  live?: boolean;
+  /** Why the last session ended, if it did. */
+  notice?: string;
 }
 
-export function Home({ onBroadcast, onWatch, live = false }: HomeProps) {
+/** Shown while nothing is running: broadcast or watch. */
+export function Home({ onBroadcast, onWatch, notice }: HomeProps) {
   const { t } = useI18n();
   const platform = usePlatform();
 
   return (
     <div className={screen.screen}>
+      {notice && (
+        <p className={screen.note} role="status">
+          {notice}
+        </p>
+      )}
       <div className={styles.bays}>
         {platform.capabilities.host && (
           <section className={[screen.panel, styles.bay].join(" ")} aria-labelledby="home-broadcast">
             <span className={[styles.badge, "label"].join(" ")}>
               <BroadcastIcon /> {t.home.broadcastLabel}
             </span>
-            <h2 id="home-broadcast" className={[screen.title, styles.titleWithLamp].join(" ")}>
-              {live && <span className="lamp" data-lit aria-hidden />}
-              {live ? t.home.liveTitle : t.home.broadcastTitle}
+            <h2 id="home-broadcast" className={screen.title}>
+              {t.home.broadcastTitle}
             </h2>
-            <p className={screen.description}>{live ? t.home.liveDescription : t.home.broadcastDescription}</p>
+            <p className={screen.description}>{t.home.broadcastDescription}</p>
             <Button variant="primary" onClick={onBroadcast} className={styles.cta}>
-              {live ? t.home.liveButton : t.home.broadcastButton}
+              {t.home.broadcastButton}
             </Button>
           </section>
         )}
