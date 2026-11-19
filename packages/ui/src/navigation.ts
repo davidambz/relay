@@ -3,27 +3,26 @@
 
 import type { SessionKind, ViewerEndReason } from "@relay/core";
 
-// Which screen is up, and the two sessions that outlive it. Pure, so every
-// combination of "on air" and "watching" is decided (and tested) here
-// rather than in scattered conditions in App.
+// The app's sessions and which one is on the stage. Pure, so every
+// combination of "on air" and "watching N broadcasts" is decided (and
+// tested) here rather than in scattered conditions in App.
 //
-// Invariant: while watching, the screen is the player ("viewing"), or the
-// broadcast's ("live") when also on air. Anything else would leave the
-// player playing hidden with no way back to it, so it's refused (or, when
-// the broadcast ends, the player comes back up).
+// There are two screens: home while nothing is running, and the stage
+// otherwise. The stage shows one tile big (the focus) and the others in a
+// strip below it; the person's own broadcast is one of those tiles.
 
-export type Screen = "home" | "pick" | "live" | "watch" | "viewing";
+/** The tile key of the person's own broadcast; watched ones use their code. */
+export const SELF = "self";
+
+export type Screen = "home" | "stage";
 
 /** The header's status readout. */
 export type HeaderStatus = "idle" | "live" | "watching" | "live-watching";
-/** Both sessions running: which one is on screen. */
-export type HeaderView = "live" | "watching";
 
-/** Why a screen is showing a note; App turns it into text. */
+/** Why a note is showing; App turns it into text. */
 export type Notice =
   | { kind: "source-ended" }
-  | { kind: "viewer-ended"; reason: Exclude<ViewerEndReason, "left"> }
-  | { kind: "watched-ended" };
+  | { kind: "viewer-ended"; code: string; reason: Exclude<ViewerEndReason, "left"> };
 
 export interface OnAir<Broadcast> {
   broadcast: Broadcast;
@@ -32,81 +31,86 @@ export interface OnAir<Broadcast> {
 }
 
 export interface NavState<Broadcast> {
-  screen: Screen;
-  /** Shown on the screen it was raised for, until the next navigation. */
-  notice?: { screen: Screen; notice: Notice };
   onAir: OnAir<Broadcast> | null;
-  /** The code being watched, if any. */
-  watching: string | null;
+  /** The codes being watched, in the order they were added. */
+  watching: string[];
+  /** The tile shown big: SELF, a watched code, or null with nothing running. */
+  focus: string | null;
+  /** Shown until dismissed or replaced. */
+  notice?: Notice;
 }
 
 export type NavAction<Broadcast> =
-  | { type: "go"; screen: Screen }
   | { type: "started"; broadcast: Broadcast }
   | { type: "retry" }
   | { type: "stopped" }
   | { type: "source-ended" }
   | { type: "watch"; code: string }
-  | { type: "left" }
-  | { type: "viewer-ended"; reason: ViewerEndReason }
+  | { type: "left"; code: string }
+  | { type: "viewer-ended"; code: string; reason: ViewerEndReason }
+  | { type: "focus"; tile: string }
+  | { type: "dismiss-notice" }
   | { type: "back" };
 
 export function initialNav<Broadcast>(): NavState<Broadcast> {
-  return { screen: "home", onAir: null, watching: null };
+  return { onAir: null, watching: [], focus: null };
 }
 
-function show<B>(state: NavState<B>, screen: Screen, notice?: Notice): NavState<B> {
-  return { ...state, screen, notice: notice && { screen, notice } };
+/** Every tile on the stage: the person's own broadcast first, then the watched ones. */
+export function tilesOf(state: NavState<unknown>): string[] {
+  return state.onAir ? [SELF, ...state.watching] : [...state.watching];
 }
 
-/** Where a request to show `screen` actually leads, or null to refuse it. */
-function resolve<B>(state: NavState<B>, screen: Screen): Screen | null {
-  if (screen === "live" && !state.onAir) return null;
-  if (state.watching && screen !== "viewing" && screen !== "live") return null;
-  if (screen === "viewing" && !state.watching) return null;
-  // One broadcast at a time: "broadcast" from home returns to it.
-  if (screen === "pick" && state.onAir) return "live";
-  return screen;
+/** Keeps the focus on a tile that still exists, else moves it to another one. */
+function refocus<B>(state: NavState<B>): NavState<B> {
+  const tiles = tilesOf(state);
+  if (state.focus !== null && tiles.includes(state.focus)) return state;
+  // Prefer a watched broadcast: the person's own is just a preview.
+  const next = state.watching[0] ?? (state.onAir ? SELF : null);
+  return { ...state, focus: next };
 }
 
 export function navReducer<B>(state: NavState<B>, action: NavAction<B>): NavState<B> {
   switch (action.type) {
-    case "go": {
-      const target = resolve(state, action.screen);
-      return target === null || target === state.screen ? state : show(state, target);
-    }
     case "started":
-      return show({ ...state, onAir: { broadcast: action.broadcast, attempt: 0 } }, "live");
+      // Going live while watching keeps the watched broadcast in focus.
+      return {
+        ...state,
+        onAir: { broadcast: action.broadcast, attempt: 0 },
+        focus: state.focus ?? SELF,
+        notice: undefined,
+      };
     case "retry":
       return state.onAir ? { ...state, onAir: { ...state.onAir, attempt: state.onAir.attempt + 1 } } : state;
     case "stopped":
-      return show({ ...state, onAir: null }, state.watching ? "viewing" : "pick");
-    case "source-ended": {
-      const next = { ...state, onAir: null };
-      // Watching something meanwhile? That's where they land.
-      if (state.watching) return state.screen === "viewing" ? next : show(next, "viewing");
-      // From the broadcast's screens, to the picker with why; elsewhere, stay.
-      if (state.screen === "live" || state.screen === "watch") return show(next, "pick", { kind: "source-ended" });
-      return next;
-    }
+      return state.onAir ? refocus({ ...state, onAir: null }) : state;
+    case "source-ended":
+      return state.onAir ? refocus({ ...state, onAir: null, notice: { kind: "source-ended" } }) : state;
     case "watch":
-      if (state.watching) return state;
-      return show({ ...state, watching: action.code }, "viewing");
+      // Already watching it: just bring it up.
+      if (state.watching.includes(action.code)) return { ...state, focus: action.code };
+      return { ...state, watching: [...state.watching, action.code], focus: action.code, notice: undefined };
     case "left":
-      return show({ ...state, watching: null }, "watch");
+      if (!state.watching.includes(action.code)) return state;
+      return refocus({ ...state, watching: state.watching.filter((code) => code !== action.code) });
     case "viewer-ended": {
       // Late news from a session already left: nothing to update.
-      if (!state.watching) return state;
-      const next = { ...state, watching: null };
-      if (state.screen === "viewing") {
-        return show(next, "watch", action.reason === "left" ? undefined : { kind: "viewer-ended", reason: action.reason });
-      }
-      // On their own broadcast's screen meanwhile: stay, and say why.
-      return action.reason === "left" ? next : show(next, state.screen, { kind: "watched-ended" });
+      if (!state.watching.includes(action.code)) return state;
+      const next = refocus({ ...state, watching: state.watching.filter((code) => code !== action.code) });
+      return action.reason === "left"
+        ? next
+        : { ...next, notice: { kind: "viewer-ended", code: action.code, reason: action.reason } };
     }
+    case "focus":
+      return tilesOf(state).includes(action.tile) && state.focus !== action.tile
+        ? { ...state, focus: action.tile }
+        : state;
+    case "dismiss-notice":
+      return state.notice ? { ...state, notice: undefined } : state;
     case "back":
-      if (state.screen === "viewing") return navReducer(state, { type: "left" });
-      if (state.screen === "watch" || state.screen === "pick") return show(state, "home");
+      // Back leaves the watched broadcast in focus; a live broadcast is
+      // only ended by Stop.
+      if (state.focus !== null && state.focus !== SELF) return navReducer(state, { type: "left", code: state.focus });
       return state;
   }
 }
@@ -117,28 +121,20 @@ export function canGoBack<B>(state: NavState<B>): boolean {
 }
 
 export interface NavView {
+  screen: Screen;
   status: HeaderStatus;
   /** What the shell is told (broadcasting outranks watching: quitting asks first). */
   session: SessionKind | null;
-  /** Both sessions running: the header's switch, and which side is up. */
-  headerView?: HeaderView;
-  /** On air, not watching, on another screen: the header leads back. */
-  returnToLive: boolean;
-  /** Live offers "watch another broadcast" (not while already watching one). */
-  canWatchFromLive: boolean;
-  /** The notice for the current screen, if any. */
-  notice?: Notice;
+  tiles: string[];
 }
 
 export function deriveView(state: NavState<unknown>): NavView {
   const live = state.onAir !== null;
-  const watching = state.watching !== null;
+  const watching = state.watching.length > 0;
   return {
+    screen: live || watching ? "stage" : "home",
     status: live ? (watching ? "live-watching" : "live") : watching ? "watching" : "idle",
     session: live ? "broadcasting" : watching ? "watching" : null,
-    headerView: live && watching ? (state.screen === "viewing" ? "watching" : "live") : undefined,
-    returnToLive: live && !watching && state.screen !== "live",
-    canWatchFromLive: live && !watching,
-    notice: state.notice?.screen === state.screen ? state.notice.notice : undefined,
+    tiles: tilesOf(state),
   };
 }

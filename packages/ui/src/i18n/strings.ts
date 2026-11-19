@@ -7,19 +7,12 @@ export interface Strings {
     statusLive: string;
     statusWatching: string;
     statusLiveWatching: string;
-    returnToLive: string;
-    viewsLabel: string;
-    viewLive: string;
-    viewWatching: string;
   };
   home: {
     broadcastLabel: string;
     broadcastTitle: string;
     broadcastDescription: string;
     broadcastButton: string;
-    liveTitle: string;
-    liveDescription: string;
-    liveButton: string;
     watchLabel: string;
     watchTitle: string;
     watchDescription: string;
@@ -36,13 +29,19 @@ export interface Strings {
     loadFailed: string;
     monitorName: (index: number) => string;
     qualityLabel: string;
+    /** The dialog's title when starting a broadcast. */
+    title: string;
+    /** The dialog's title when picking a new source mid-broadcast. */
+    switchTitle: string;
+    streamingLabel: string;
+    change: string;
+    cancel: string;
     back: string;
     start: string;
     starting: string;
     /** Picking a new source for a live broadcast. */
     switchTo: string;
     switching: string;
-    cancelSwitch: string;
     captureFailed: string;
   };
   quality: {
@@ -66,36 +65,49 @@ export interface Strings {
     confirm: string;
     cancel: string;
   };
-  live: {
-    previewLabel: string;
-    changeSource: string;
-    switchingNotice: string;
-    switchFailed: string;
+  /** The stage: the tile in focus, the strip of the others, the control bar. */
+  stage: {
     codeLabel: string;
     copy: string;
     copied: string;
-    viewersLabel: string;
-    sourceLabel: string;
-    qualityLabel: string;
-    stop: string;
     codePending: string;
+    viewersLabel: string;
+    /** The viewer readout: just the count, or "N of M" when a cap is configured. */
+    viewersCount: (count: number, max?: number) => string;
+    /** The person's own tile. */
+    yourTile: (sourceName: string) => string;
+    onAir: string;
+    tilesLabel: string;
+    showTile: (name: string) => string;
+    inMiniPlayer: string;
     startFailed: string;
     retry: string;
     reconnecting: string;
-    /** The viewer readout: just the count, or "N of M" when a cap is configured. */
-    viewersCount: (count: number, max?: number) => string;
-    noViewersYet: string;
-    watchOther: string;
-    watchedEnded: string;
+    switchFailed: string;
     sourceEnded: string;
+    /** A watched broadcast went away: its code, then why. */
+    viewerEnded: (code: string, reason: string) => string;
+    dismiss: string;
+    addWatch: string;
+    goLive: string;
+    switchSource: string;
+    settings: string;
+    settingsTitle: string;
+    soundOn: string;
+    soundOff: string;
+    stop: string;
+    leave: string;
+    controlsLabel: string;
   };
   watch: {
     codeLabel: string;
     codeHint: string;
     codeInvalid: string;
     ownCode: string;
-    back: string;
+    title: string;
+    cancel: string;
     watch: string;
+    connecting: string;
     ended: string;
     full: string;
     notFound: string;
@@ -114,9 +126,7 @@ export interface Strings {
     failed: string;
   };
   viewing: {
-    label: string;
     connecting: (code: string) => string;
-    leave: string;
     mute: string;
     unmute: string;
     volume: string;

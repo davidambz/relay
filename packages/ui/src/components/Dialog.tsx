@@ -12,13 +12,15 @@ interface DialogProps {
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  /** "wide" fits a grid of thumbnails (the source picker). */
+  size?: "default" | "wide";
 }
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Modal panel in the instrument-panel style: nameplate header, focus trap, Esc closes. */
-export function Dialog({ title, onClose, children, footer }: DialogProps) {
+export function Dialog({ title, onClose, children, footer, size = "default" }: DialogProps) {
   const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -77,6 +79,7 @@ export function Dialog({ title, onClose, children, footer }: DialogProps) {
     <div className={styles.overlay} onMouseDown={onClose}>
       <div
         className={styles.panel}
+        data-size={size}
         role="dialog"
         aria-modal="true"
         aria-label={title}

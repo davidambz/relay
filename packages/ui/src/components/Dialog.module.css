@@ -22,6 +22,21 @@
   animation: riseIn var(--duration-base) var(--ease-standard);
 }
 
+.panel[data-size="wide"] {
+  width: min(820px, calc(100vw - var(--space-6)));
+  max-height: min(760px, calc(100vh - var(--space-6)));
+}
+
+@media (max-width: 520px) {
+  .panel {
+    width: calc(100vw - var(--space-4));
+    max-height: calc(100vh - var(--space-4));
+  }
+  .panel[data-size="wide"] {
+    width: calc(100vw - var(--space-4));
+  }
+}
+
 .panel:focus {
   outline: none;
 }

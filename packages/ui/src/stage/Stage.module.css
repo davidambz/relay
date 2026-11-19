@@ -1,0 +1,397 @@
+/* The stage steps back like the player did: a near-black room where the
+   pictures get the space, with the instrument chrome (code visor, strip,
+   control bar) around them. Fixed light-on-dark colors in both themes. */
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
+  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
+  background: #08090a;
+  color: #eef2f3;
+  user-select: none;
+}
+
+.stage[data-chrome="hidden"] {
+  cursor: none;
+}
+
+@media (max-width: 520px) {
+  .stage {
+    padding: var(--space-2);
+  }
+}
+
+/* ---- Top: the person's own broadcast (code, viewers) and notes ---- */
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.top :global(.label) {
+  color: #a0aaae;
+}
+
+.onAir {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* The share code: a recessed, lit equipment display. */
+.visor {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--visor-bg);
+  border: 1px solid var(--monitor-bezel-edge);
+  box-shadow: var(--shadow-inset);
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  margin-right: -0.22em;
+  color: var(--visor-text);
+  text-shadow: 0 0 12px rgba(95, 227, 212, 0.45);
+  user-select: all;
+}
+
+.visor[data-pending="true"] .code {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  letter-spacing: normal;
+  margin-right: 0;
+  color: #6d787d;
+  text-shadow: none;
+}
+
+.copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(to bottom, #262c30, #1b1f22);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  color: #eef2f3;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.copy:hover:not(:disabled) {
+  border-color: rgba(95, 227, 212, 0.5);
+}
+
+.copy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.copy:focus-visible {
+  outline: 2px solid #3fd0c0;
+  outline-offset: 2px;
+}
+
+.copy svg {
+  width: 16px;
+  height: 16px;
+}
+
+.viewers {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.readout {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.lamps {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.notes:empty {
+  display: none;
+}
+
+.note,
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid #2e3438;
+  background: #111416;
+  color: #c4ccd0;
+}
+
+.error {
+  border-color: #ff7b8f;
+  background: #34161d;
+  color: #ff9aaa;
+}
+
+.noteAction,
+.noteDismiss {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.noteDismiss {
+  width: 32px;
+  padding: 0;
+}
+
+.noteDismiss svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---- The tile in focus ---- */
+
+.focus {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* ---- Strip of the other tiles, and the control bar ---- */
+
+.dock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.strip {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding: 2px;
+  /* Centered while it fits; scrolls from the start once it doesn't. */
+  justify-content: safe center;
+}
+
+.bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.barCenter,
+.barEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.barEnd {
+  justify-content: flex-end;
+}
+
+.barDivider {
+  width: 1px;
+  height: 28px;
+  margin: 0 var(--space-1);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+@media (max-width: 760px) {
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .barStart {
+    display: none;
+  }
+}
+
+.stage[data-chrome="hidden"] .bar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Machined keys, bigger than the panel's buttons: the stage's main controls. */
+.control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(to bottom, #262c30, #1b1f22);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  color: #eef2f3;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.control:hover {
+  border-color: rgba(95, 227, 212, 0.5);
+}
+
+.control:focus-visible {
+  outline: 2px solid #3fd0c0;
+  outline-offset: 2px;
+}
+
+.control[aria-pressed="true"] {
+  color: #ff9aaa;
+}
+
+.control[data-tone="danger"] {
+  background: linear-gradient(to bottom, #8f2440, #741a33);
+  border-color: rgba(255, 123, 143, 0.5);
+}
+
+.control[data-tone="danger"]:hover {
+  background: linear-gradient(to bottom, #a52a4a, #86203c);
+}
+
+.control svg {
+  width: 22px;
+  height: 22px;
+}
+
+@media (max-width: 520px) {
+  .control {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Volume as a recessed fader groove with a teal fill. */
+.volume {
+  --fill: 100%;
+  appearance: none;
+  width: 110px;
+  height: 6px;
+  margin: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(to right, #3fd0c0 var(--fill), rgba(255, 255, 255, 0.18) var(--fill));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+}
+
+.volume::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 18px;
+  border-radius: 2px;
+  background: #e9eef0;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.volume::-moz-range-thumb {
+  width: 14px;
+  height: 18px;
+  border-radius: 2px;
+  background: #e9eef0;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 420px) {
+  .volume {
+    width: 72px;
+  }
+}
+
+/* ---- Fullscreen: the picture takes it all, the dock floats over it ---- */
+
+.stage[data-fullscreen] {
+  position: relative;
+  padding: 0;
+}
+
+.stage[data-fullscreen] .top {
+  display: none;
+}
+
+.stage[data-fullscreen] .focus > * {
+  border-radius: 0;
+}
+
+.stage[data-fullscreen] .dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--space-6) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+}
+
+.stage[data-fullscreen][data-chrome="hidden"] .dock {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---- In the system's PiP window (the whole app, shrunk): the picture only ---- */
+
+.stage[data-pip] {
+  padding: 0;
+}
+
+.stage[data-pip] .top,
+.stage[data-pip] .dock {
+  display: none;
+}
+
+.stage[data-pip] .focus > * {
+  border-radius: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock,
+  .bar {
+    transition: none;
+  }
+}

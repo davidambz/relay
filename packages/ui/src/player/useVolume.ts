@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 import { usePlatform } from "../platform/PlatformContext";
 
 const VOLUME_KEY = "player.volume";
-const MUTED_KEY = "player.muted";
 
 function clampVolume(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : undefined;
@@ -19,49 +18,56 @@ export interface VolumeControls {
   toggleMuted: () => void;
 }
 
-/** Volume and mute, remembered across sessions through Platform.storage. */
-export function useVolume(): VolumeControls {
+interface Level {
+  volume: number;
+  muted: boolean;
+}
+
+/**
+ * Volume and mute per watched broadcast (by code), so one can be turned
+ * down without touching the others. The last volume set is remembered
+ * through Platform.storage and is where a newly watched broadcast starts;
+ * mute is per broadcast and not remembered.
+ */
+export function useVolumes(): (code: string) => VolumeControls {
   const { storage } = usePlatform();
-  const [volume, setVolumeState] = useState(1);
-  const [muted, setMutedState] = useState(false);
+  const [initial, setInitial] = useState(1);
+  const [levels, setLevels] = useState<Record<string, Level>>({});
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([storage.get<number>(VOLUME_KEY), storage.get<boolean>(MUTED_KEY)]).then(([storedVolume, storedMuted]) => {
-      if (cancelled) return;
-      const restored = clampVolume(storedVolume);
-      if (restored !== undefined) setVolumeState(restored);
-      if (typeof storedMuted === "boolean") setMutedState(storedMuted);
+    void storage.get<number>(VOLUME_KEY).then((stored) => {
+      const restored = clampVolume(stored);
+      if (!cancelled && restored !== undefined) setInitial(restored);
     });
     return () => {
       cancelled = true;
     };
   }, [storage]);
 
-  const setVolume = useCallback(
-    (next: number) => {
-      const value = clampVolume(next) ?? 1;
-      setVolumeState(value);
-      void storage.set(VOLUME_KEY, value);
-      // Dragging the slider up is an obvious "I want sound": unmute.
-      if (value > 0) {
-        setMutedState(false);
-        void storage.set(MUTED_KEY, false);
-      }
-    },
-    [storage],
-  );
+  const update = useCallback((code: string, change: (level: Level) => Level, fallback: number) => {
+    setLevels((current) => ({ ...current, [code]: change(current[code] ?? { volume: fallback, muted: false }) }));
+  }, []);
 
-  const setMuted = useCallback(
-    (next: boolean) => {
-      setMutedState(next);
-      void storage.set(MUTED_KEY, next);
+  return useCallback(
+    (code: string): VolumeControls => {
+      const level = levels[code] ?? { volume: initial, muted: false };
+      const setVolume = (next: number) => {
+        const volume = clampVolume(next) ?? 1;
+        void storage.set(VOLUME_KEY, volume);
+        // Dragging the slider up is an obvious "I want sound": unmute.
+        update(code, (current) => ({ volume, muted: volume > 0 ? false : current.muted }), initial);
+      };
+      const setMuted = (muted: boolean) => update(code, (current) => ({ ...current, muted }), initial);
+      return {
+        ...level,
+        setVolume,
+        setMuted,
+        toggleMuted: () => update(code, (current) => ({ ...current, muted: !current.muted }), initial),
+      };
     },
-    [storage],
+    [levels, initial, storage, update],
   );
-
-  const toggleMuted = useCallback(() => setMuted(!muted), [muted, setMuted]);
-  return { volume, muted, setVolume, setMuted, toggleMuted };
 }
 
 /**

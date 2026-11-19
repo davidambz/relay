@@ -150,3 +150,57 @@ export function GripIcon(props: IconProps) {
     </svg>
   );
 }
+
+/** A monitor with a cross: stop sharing the screen. */
+export function StopBroadcastIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="2" y="4" width="20" height="13" rx="2" />
+      <path d="M8 21h8M12 17v4" />
+      <path d="m9.5 8 5 5M14.5 8l-5 5" />
+    </svg>
+  );
+}
+
+/** A monitor with a swap arrow: broadcast another source. */
+export function SwitchSourceIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="2" y="4" width="20" height="13" rx="2" />
+      <path d="M8 21h8M12 17v4" />
+      <path d="M8 9.5h7l-2-2M16 11.5H9l2 2" />
+    </svg>
+  );
+}
+
+/** Two faders: the broadcast's settings. */
+export function SlidersIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+      <rect x="14" y="5" width="4" height="4" rx="1" />
+      <rect x="8" y="15" width="4" height="4" rx="1" />
+    </svg>
+  );
+}
+
+/** A screen with a plus: watch one more broadcast. */
+export function AddWatchIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M13 4H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3" />
+      <path d="M8 21h8M12 17v4" />
+      <path d="M19 2v6M16 5h6" />
+    </svg>
+  );
+}
+
+/** An arrow out of a door: stop watching this broadcast. */
+export function LeaveIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
+      <path d="M10 8l-4 4 4 4M6 12h10" />
+    </svg>
+  );
+}
