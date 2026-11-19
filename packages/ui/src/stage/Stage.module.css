@@ -206,6 +206,10 @@
   transition: opacity var(--duration-base) var(--ease-standard);
 }
 
+.strip[hidden] {
+  display: none;
+}
+
 .strip {
   display: flex;
   gap: var(--space-3);

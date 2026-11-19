@@ -82,9 +82,10 @@ export function useBroadcast(
   if (local.broadcast !== broadcast) setLocal(localFor(broadcast));
 
   const stream = broadcast?.stream ?? null;
+  // A session (new, or a retry) starts with the quality as it is now.
   const [host, { setEncoderSettings, replaceSource }] = useHostSession(
     stream,
-    encoderSettingsFor(broadcast?.quality ?? local.quality),
+    encoderSettingsFor(local.quality),
     onAir?.attempt ?? 0,
   );
 

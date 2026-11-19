@@ -34,10 +34,16 @@ describe("WatchDialog", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("That code isn't valid");
   });
 
-  it("waits while connecting, then shows why it couldn't", () => {
-    const { rerender } = render(<WatchDialog onClose={() => {}} onWatch={() => {}} connecting />);
+  it("waits while connecting, then shows why it couldn't, until the code is edited", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<WatchDialog onClose={() => {}} onWatch={() => {}} />);
+    await user.type(screen.getByLabelText("Broadcast code"), "ABC234{Enter}");
+    rerender(<WatchDialog onClose={() => {}} onWatch={() => {}} connecting />);
     expect(screen.getByRole("button", { name: "Connecting…" })).toBeDisabled();
     rerender(<WatchDialog onClose={() => {}} onWatch={() => {}} error="Nobody is broadcasting with that code." />);
     expect(screen.getByRole("alert")).toHaveTextContent("Nobody is broadcasting");
+    await user.type(screen.getByLabelText("Broadcast code"), "{Backspace}5");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Broadcast code")).not.toHaveAttribute("aria-invalid", "true");
   });
 });

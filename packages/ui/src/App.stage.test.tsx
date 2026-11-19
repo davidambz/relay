@@ -101,6 +101,23 @@ describe("the stage", () => {
     expect(network.peers.has(`relay-tenno-v1-${code}`)).toBe(true);
   });
 
+  it("starts the session with the encoder settings of the quality picked", async () => {
+    const network = new FakeNetwork();
+    const host = renderApp(network);
+    fireEvent.click(await host.app.findByRole("button", { name: "Go live" }));
+    const dialog = await openDialog("Share your screen");
+    fireEvent.click(await dialog.findByRole("button", { name: /Monitor 1/ }));
+    fireEvent.click(dialog.getByRole("radio", { name: /30 FPS/ }));
+    fireEvent.click(dialog.getByRole("button", { name: "Go live" }));
+    const code = (await host.app.findByText(/^[A-Z2-9]{6}$/)).textContent!;
+
+    await watchCode(renderApp(network).app, code);
+    expect(await host.app.findByText("1")).toBeInTheDocument();
+    const sender = network.peers.get(`relay-tenno-v1-${code}`)!.calls[0].sender;
+    // 30 FPS is the text-and-code profile: resolution comes first.
+    await vi.waitFor(() => expect(sender.degradation.at(-1)).toBe("maintain-resolution"));
+  });
+
   it("shows an error and stays in the dialog when capture fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { app } = renderApp(new FakeNetwork(), {

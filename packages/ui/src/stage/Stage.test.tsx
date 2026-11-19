@@ -10,6 +10,8 @@ import { useVolumes } from "../player/useVolume";
 import { fakePlatform } from "../test/fakePlatform";
 import { Stage } from "./Stage";
 
+const CODES = ["ABC234"];
+
 interface Options {
   storage?: Map<string, unknown>;
   platform?: Partial<Platform>;
@@ -17,14 +19,14 @@ interface Options {
 }
 
 function StageWithVolumes({ pictureInPicture, onLeave }: { pictureInPicture?: boolean; onLeave: (code: string) => void }) {
-  const volumeFor = useVolumes();
+  const volumes = useVolumes(CODES);
   return (
     <Stage
       tiles={["ABC234"]}
       focus="ABC234"
       broadcast={null}
       viewers={{ ABC234: { status: "connecting" } }}
-      volumeFor={volumeFor}
+      volumes={volumes}
       onDismissNotice={() => {}}
       onFocus={() => {}}
       onLeave={onLeave}

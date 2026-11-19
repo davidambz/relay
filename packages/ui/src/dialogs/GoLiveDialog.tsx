@@ -115,12 +115,14 @@ export function GoLiveDialog({ onClose, onStarted, mode = "start", audio: fixedA
   }
 
   const title = switching ? t.picker.switchTitle : t.picker.title;
+  // Mid-capture, closing would still go live (or switch) once it resolves.
+  const close = starting ? () => {} : onClose;
 
   if (step === "confirm" && selected) {
     return (
       <Dialog
         title={title}
-        onClose={onClose}
+        onClose={close}
         footer={
           <>
             <Button variant="ghost" onClick={() => setStep("source")} disabled={starting}>

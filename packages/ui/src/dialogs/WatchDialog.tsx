@@ -25,13 +25,19 @@ export function WatchDialog({ onClose, onWatch, ownCode, connecting = false, err
   const { t } = useI18n();
   const [code, setCode] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  // The last code handed to onWatch: `error` is about that one only.
+  const [sentCode, setSentCode] = useState<string | null>(null);
+  const showError = error !== undefined && !connecting && code === sentCode;
   const valid = isValidCode(code);
   const own = valid && code === ownCode;
 
   function submit(event: FormEvent) {
     event.preventDefault();
     setSubmitted(true);
-    if (valid && !own) onWatch(code);
+    if (valid && !own) {
+      setSentCode(code);
+      onWatch(code);
+    }
   }
 
   return (
@@ -69,7 +75,7 @@ export function WatchDialog({ onClose, onWatch, ownCode, connecting = false, err
             spellCheck={false}
             inputMode="text"
             aria-describedby="watch-code-hint"
-            aria-invalid={(submitted && (!valid || own)) || (error !== undefined && !connecting)}
+            aria-invalid={(submitted && (!valid || own)) || showError}
             placeholder={"·".repeat(CODE_LENGTH)}
             readOnly={connecting}
             autoFocus
@@ -88,7 +94,7 @@ export function WatchDialog({ onClose, onWatch, ownCode, connecting = false, err
             {t.watch.ownCode}
           </p>
         )}
-        {error && !connecting && (
+        {showError && (
           <p className={screen.error} role="alert">
             {error}
           </p>

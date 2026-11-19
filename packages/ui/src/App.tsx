@@ -78,7 +78,7 @@ export function App() {
   }, [nav, dialog]);
   const [, rememberQuality] = useStreamQuality();
   const platform = usePlatform();
-  const volumeFor = useVolumes();
+  const volumes = useVolumes(nav.watching);
 
   const handleSourceEnded = useCallback(() => dispatch({ type: "source-ended" }), []);
   const [broadcast, broadcastActions] = useBroadcast(nav.onAir, {
@@ -156,10 +156,22 @@ export function App() {
     dispatch({ type: "dismiss-notice" });
   }
 
+  // A dialog about something that went away meanwhile (the broadcast
+  // ended, the watched one dropped) has nothing left to act on.
+  const orphaned =
+    ((dialog?.kind === "switch-source" || dialog?.kind === "settings" || dialog?.kind === "stop") && !nav.onAir) ||
+    (dialog?.kind === "leave" && !nav.watching.includes(dialog.code));
+  if (orphaned) setDialog(null);
+
   const ownCode = broadcast?.host.status === "live" ? broadcast.host.code : undefined;
   const notice = noticeText(nav.notice, t);
   const canHost = platform.capabilities.host;
   const closeDialog = () => setDialog(null);
+  // Dialogs live outside the stage; in fullscreen they'd open unseen.
+  const openDialog = (next: OpenDialog) => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    setDialog(next);
+  };
 
   return (
     <div className={styles.app}>
@@ -178,17 +190,17 @@ export function App() {
             focus={nav.focus}
             broadcast={broadcast}
             viewers={viewers}
-            volumeFor={volumeFor}
+            volumes={volumes}
             notice={notice}
             onDismissNotice={() => dispatch({ type: "dismiss-notice" })}
             onFocus={(tile) => dispatch({ type: "focus", tile })}
-            onLeave={(code) => setDialog({ kind: "leave", code })}
-            onStop={() => setDialog({ kind: "stop" })}
+            onLeave={(code) => openDialog({ kind: "leave", code })}
+            onStop={() => openDialog({ kind: "stop" })}
             onRetry={() => dispatch({ type: "retry" })}
-            onAddWatch={() => setDialog({ kind: "watch" })}
-            onGoLive={canHost ? () => setDialog({ kind: "go-live" }) : undefined}
-            onSwitchSource={() => setDialog({ kind: "switch-source" })}
-            onSettings={() => setDialog({ kind: "settings" })}
+            onAddWatch={() => openDialog({ kind: "watch" })}
+            onGoLive={canHost ? () => openDialog({ kind: "go-live" }) : undefined}
+            onSwitchSource={() => openDialog({ kind: "switch-source" })}
+            onSettings={() => openDialog({ kind: "settings" })}
             onAudioChange={broadcastActions.setAudioOn}
             pictureInPicture={pictureInPicture}
             active={dialog === null && quitPrompt === null}
@@ -211,7 +223,10 @@ export function App() {
           audio={broadcast.hasAudio}
           onClose={closeDialog}
           onStarted={(next) => {
-            void broadcastActions.switchSource(next).then(() => setDialog(null));
+            // Close this dialog only: another may have opened meanwhile.
+            void broadcastActions
+              .switchSource(next)
+              .then(() => setDialog((current) => (current?.kind === "switch-source" ? null : current)));
           }}
         />
       )}

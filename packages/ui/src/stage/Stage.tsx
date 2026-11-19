@@ -27,7 +27,7 @@ import { actionForKey, isTypingTarget } from "../player/shortcuts";
 import { useAutoHide } from "../player/useAutoHide";
 import { useChildWindow } from "../player/useChildWindow";
 import { useFullscreen } from "../player/useFullscreen";
-import { canSetVolume, type VolumeControls } from "../player/useVolume";
+import { canSetVolume, type Volumes } from "../player/useVolume";
 import type { Broadcast } from "../session/useBroadcast";
 import type { ViewerState } from "../session/useViewerSession";
 import { Tile } from "./Tile";
@@ -39,7 +39,7 @@ interface StageProps {
   focus: string | null;
   broadcast: Broadcast | null;
   viewers: Record<string, ViewerState>;
-  volumeFor: (code: string) => VolumeControls;
+  volumes: Volumes;
   notice?: string;
   onDismissNotice: () => void;
   onFocus: (tile: string) => void;
@@ -117,7 +117,7 @@ export function Stage({
   focus,
   broadcast,
   viewers,
-  volumeFor,
+  volumes,
   notice,
   onDismissNotice,
   onFocus,
@@ -143,8 +143,8 @@ export function Stage({
   const [stripHidden, setStripHidden] = useStripHidden();
 
   const watchedFocus = focus !== null && focus !== SELF ? focus : null;
-  const focusAudio = watchedFocus ? volumeFor(watchedFocus) : null;
-  const toggleFocusMuted = focusAudio?.toggleMuted;
+  const focusAudio = watchedFocus ? volumes.controlsFor(watchedFocus) : null;
+  const { toggleMuted } = volumes;
 
   // The desktop mini player: one watched broadcast in its own window.
   const [floatingCode, setFloatingCode] = useState<string | null>(null);
@@ -217,7 +217,7 @@ export function Stage({
       if (event.repeat || isTypingTarget(event.target)) return;
       const action = actionForKey(event);
       if (action === "fullscreen") void fullscreen.toggle();
-      else if (action === "mute" && toggleFocusMuted) toggleFocusMuted();
+      else if (action === "mute" && watchedFocus) toggleMuted(watchedFocus);
       else if (action === "floating" && canFloat) openFloating();
       else return;
       event.preventDefault();
@@ -225,7 +225,7 @@ export function Stage({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [active, fullscreen, toggleFocusMuted, chrome, canFloat, openFloating]);
+  }, [active, fullscreen, toggleMuted, watchedFocus, chrome, canFloat, openFloating]);
 
   function onStagePointer(event: PointerEvent<HTMLDivElement>) {
     if (event.pointerType === "touch") return;
@@ -260,7 +260,7 @@ export function Stage({
     }
     const state = viewers[tile] ?? { status: "connecting" };
     const inMini = floatingCode === tile && floatingContainer !== null;
-    const audio = volumeFor(tile);
+    const audio = volumes.controlsFor(tile);
     return (
       <Tile
         key={tile}
@@ -362,8 +362,9 @@ export function Stage({
       <div className={styles.focus}>{focus !== null && tileFor(focus, "focus")}</div>
 
       <div className={styles.dock}>
-        {others.length > 0 && !stripHidden && (
-          <div className={styles.strip} role="group" aria-label={t.stage.tilesLabel}>
+        {others.length > 0 && (
+          // Hidden, not unmounted: the broadcasts in it keep playing their sound.
+          <div hidden={stripHidden} className={styles.strip} role="group" aria-label={t.stage.tilesLabel}>
             {others.map((tile) => tileFor(tile, "thumb"))}
           </div>
         )}
@@ -386,9 +387,12 @@ export function Stage({
             </BarButton>
             {broadcast ? (
               <>
-                <BarButton label={t.stage.switchSource} onClick={onSwitchSource}>
-                  <SwitchSourceIcon />
-                </BarButton>
+                {/* Switching needs the session up (it swaps the tracks it sends). */}
+                {live && (
+                  <BarButton label={t.stage.switchSource} onClick={onSwitchSource}>
+                    <SwitchSourceIcon />
+                  </BarButton>
+                )}
                 <BarButton label={t.stage.settings} onClick={onSettings}>
                   <SlidersIcon />
                 </BarButton>
@@ -473,7 +477,7 @@ export function Stage({
         <FloatingPlayer
           container={floatingContainer}
           stream={floatingState?.status === "playing" ? floatingState.stream : null}
-          audio={volumeFor(floatingCode)}
+          audio={volumes.controlsFor(floatingCode)}
           onReturn={closeFloating}
         />
       )}

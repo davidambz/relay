@@ -1,7 +1,7 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HostSession, loadSessionConfig, type EncoderSettings } from "@relay/core";
 import { usePlatform } from "../platform/PlatformContext";
 import { usePeerFactory } from "./PeerFactoryContext";
@@ -40,9 +40,13 @@ export function useHostSession(
     setState({ status: stream ? "starting" : "off" });
   }
   const sessionRef = useRef<HostSession | null>(null);
-  // Encoder settings at the time the session starts; later changes go
-  // through setEncoderSettings so they don't restart the broadcast.
-  const initialEncoder = useRef(encoder);
+  // The latest encoder settings, read when a session starts (a new stream
+  // or a retry). Changes mid-broadcast go through setEncoderSettings, so
+  // they don't restart it.
+  const latestEncoder = useRef(encoder);
+  useLayoutEffect(() => {
+    latestEncoder.current = encoder;
+  });
 
   useEffect(() => {
     if (!stream) return;
@@ -56,7 +60,7 @@ export function useHostSession(
       const config = await loadSessionConfig(platform.storage);
       if (disposed) return;
       session = new HostSession(stream, config, createPeer, {
-        ...initialEncoder.current,
+        ...latestEncoder.current,
         onViewersChange: (viewers) =>
           update((current) => (current.status === "live" ? { ...current, viewers } : current)),
         onSignalingChange: (signaling) =>
@@ -95,7 +99,6 @@ export function useHostSession(
   }, [stream, attempt, platform, createPeer]);
 
   const setEncoderSettings = useCallback((settings: EncoderSettings) => {
-    initialEncoder.current = { ...initialEncoder.current, ...settings };
     sessionRef.current?.setEncoderSettings(settings);
   }, []);
 
