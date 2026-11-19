@@ -151,6 +151,18 @@ export function GripIcon(props: IconProps) {
   );
 }
 
+/** A big screen over a row of small ones: the strip of other broadcasts. */
+export function StripIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="3" width="18" height="11" rx="1.5" />
+      <rect x="3" y="17" width="5" height="4" rx="1" />
+      <rect x="9.5" y="17" width="5" height="4" rx="1" />
+      <rect x="16" y="17" width="5" height="4" rx="1" />
+    </svg>
+  );
+}
+
 /** A monitor with a cross: stop sharing the screen. */
 export function StopBroadcastIcon(props: IconProps) {
   return (

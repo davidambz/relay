@@ -99,6 +99,8 @@ export const ptBR: Strings = {
     stop: "Parar transmissão",
     leave: "Sair desta live",
     controlsLabel: "Controles",
+    hideStrip: "Esconder as outras transmissões",
+    showStrip: (count) => (count === 1 ? "Mostrar a outra transmissão" : `Mostrar as outras ${count} transmissões`),
   },
   watch: {
     codeLabel: "Código da transmissão",

@@ -106,6 +106,9 @@ export interface Strings {
     stop: string;
     leave: string;
     controlsLabel: string;
+    hideStrip: string;
+    /** The strip is hidden: show the N other broadcasts. */
+    showStrip: (count: number) => string;
   };
   watch: {
     codeLabel: string;

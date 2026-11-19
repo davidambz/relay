@@ -99,6 +99,8 @@ export const en: Strings = {
     stop: "Stop broadcast",
     leave: "Leave this broadcast",
     controlsLabel: "Controls",
+    hideStrip: "Hide the other broadcasts",
+    showStrip: (count) => (count === 1 ? "Show the other broadcast" : `Show the ${count} other broadcasts`),
   },
   watch: {
     codeLabel: "Broadcast code",

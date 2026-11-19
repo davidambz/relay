@@ -12,6 +12,7 @@ import {
   LeaveIcon,
   MiniPlayerIcon,
   MutedIcon,
+  StripIcon,
   SlidersIcon,
   StopBroadcastIcon,
   SwitchSourceIcon,
@@ -81,6 +82,31 @@ function BarButton({ label, onClick, children, tone, pressed }: BarButtonProps) 
   );
 }
 
+const STRIP_HIDDEN_KEY = "stage.stripHidden";
+
+/** Whether the strip of the other broadcasts is tucked away, remembered across sessions. */
+function useStripHidden(): [boolean, (hidden: boolean) => void] {
+  const { storage } = usePlatform();
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void storage.get<boolean>(STRIP_HIDDEN_KEY).then((stored) => {
+      if (!cancelled && typeof stored === "boolean") setHidden(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storage]);
+  const set = useCallback(
+    (next: boolean) => {
+      setHidden(next);
+      void storage.set(STRIP_HIDDEN_KEY, next);
+    },
+    [storage],
+  );
+  return [hidden, set];
+}
+
 /**
  * Everything running, on one stage: the tile in focus big, the others in a
  * strip below it (click one to bring it up), the person's own broadcast
@@ -114,6 +140,7 @@ export function Stage({
   const fullscreen = useFullscreen(stageRef);
   const volumeSupported = useMemo(() => canSetVolume(), []);
   const [copied, setCopied] = useState(false);
+  const [stripHidden, setStripHidden] = useStripHidden();
 
   const watchedFocus = focus !== null && focus !== SELF ? focus : null;
   const focusAudio = watchedFocus ? volumeFor(watchedFocus) : null;
@@ -335,7 +362,7 @@ export function Stage({
       <div className={styles.focus}>{focus !== null && tileFor(focus, "focus")}</div>
 
       <div className={styles.dock}>
-        {others.length > 0 && (
+        {others.length > 0 && !stripHidden && (
           <div className={styles.strip} role="group" aria-label={t.stage.tilesLabel}>
             {others.map((tile) => tileFor(tile, "thumb"))}
           </div>
@@ -418,6 +445,16 @@ export function Stage({
                   />
                 )}
               </>
+            )}
+            {others.length > 0 && (
+              <BarButton
+                label={stripHidden ? t.stage.showStrip(others.length) : t.stage.hideStrip}
+                onClick={() => setStripHidden(!stripHidden)}
+                pressed={stripHidden}
+              >
+                <StripIcon />
+                {stripHidden && <span className={styles.hiddenCount}>{others.length}</span>}
+              </BarButton>
             )}
             {canFloat && (
               <BarButton label={t.viewing.miniPlayer} onClick={openFloating}>

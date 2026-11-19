@@ -137,6 +137,12 @@ describe("the stage", () => {
     fireEvent.click(within(strip).getByRole("button", { name: `Show ${firstCode}` }));
     expect(within(strip).getByRole("button", { name: `Show ${secondCode}` })).toBeInTheDocument();
 
+    // The strip tucks away so the focus gets the room, and comes back.
+    fireEvent.click(app.getByRole("button", { name: "Hide the other broadcasts" }));
+    expect(app.queryByRole("group", { name: "Broadcasts" })).not.toBeInTheDocument();
+    fireEvent.click(app.getByRole("button", { name: "Show the other broadcast" }));
+    expect(app.getByRole("group", { name: "Broadcasts" })).toBeInTheDocument();
+
     // Leaving the one in focus ends only that one.
     fireEvent.click(app.getByRole("button", { name: "Leave this broadcast" }));
     expect(await first.app.findByText("0")).toBeInTheDocument();
