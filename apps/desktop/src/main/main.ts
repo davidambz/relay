@@ -300,6 +300,7 @@ function manageFloating(child: BrowserWindow, owner: BrowserWindow): () => void 
     if (next === passThrough) return;
     passThrough = next;
     child.setIgnoreMouseEvents(next);
+    if (!app.isPackaged) console.log(`Mini player lets the mouse through: ${next}`);
   };
 
   const hoverTimer = setInterval(() => {
