@@ -16,6 +16,8 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 add_executable(winlist
     src/main.cpp
+    src/foreground.cpp
+    src/foreground.h
     src/json_writer.cpp
     src/json_writer.h
     src/window_list.cpp
