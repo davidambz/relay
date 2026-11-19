@@ -63,6 +63,13 @@ export const en: Strings = {
     confirm: "Stop broadcast",
     cancel: "Keep broadcasting",
   },
+  leaveLive: {
+    title: "Leave broadcast",
+    message: (code) => `Stop watching ${code}?`,
+    detail: "To come back, enter the code again.",
+    confirm: "Leave",
+    cancel: "Keep watching",
+  },
   quitWhileLive: {
     title: "You're broadcasting",
     message: "Quit Relay and end the broadcast?",

@@ -65,6 +65,14 @@ export interface Strings {
     confirm: string;
     cancel: string;
   };
+  /** Asked before leaving a watched broadcast. */
+  leaveLive: {
+    title: string;
+    message: (code: string) => string;
+    detail: string;
+    confirm: string;
+    cancel: string;
+  };
   /** Asked when quitting the app (e.g. from the tray) mid-broadcast. */
   quitWhileLive: {
     title: string;

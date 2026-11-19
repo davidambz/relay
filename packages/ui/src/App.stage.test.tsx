@@ -143,8 +143,14 @@ describe("the stage", () => {
     fireEvent.click(app.getByRole("button", { name: "Show the other broadcast" }));
     expect(app.getByRole("group", { name: "Broadcasts" })).toBeInTheDocument();
 
-    // Leaving the one in focus ends only that one.
+    // Leaving the one in focus asks first, then ends only that one.
     fireEvent.click(app.getByRole("button", { name: "Leave this broadcast" }));
+    fireEvent.click((await openDialog("Leave broadcast")).getByRole("button", { name: "Keep watching" }));
+    expect(app.getByRole("group", { name: "Broadcasts" })).toBeInTheDocument();
+    fireEvent.click(app.getByRole("button", { name: "Leave this broadcast" }));
+    const leave = await openDialog("Leave broadcast");
+    expect(leave.getByText(/^Stop watching [A-Z2-9]{6}\?$/)).toBeInTheDocument();
+    fireEvent.click(leave.getByRole("button", { name: "Leave" }));
     expect(await first.app.findByText("0")).toBeInTheDocument();
     expect(second.app.getByText("1")).toBeInTheDocument();
     expect(app.queryByRole("group", { name: "Broadcasts" })).not.toBeInTheDocument();

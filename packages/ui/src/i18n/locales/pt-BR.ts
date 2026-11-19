@@ -63,6 +63,13 @@ export const ptBR: Strings = {
     confirm: "Parar transmissão",
     cancel: "Continuar transmitindo",
   },
+  leaveLive: {
+    title: "Sair da live",
+    message: (code) => `Parar de assistir ${code}?`,
+    detail: "Para voltar, é só digitar o código de novo.",
+    confirm: "Sair",
+    cancel: "Continuar assistindo",
+  },
   quitWhileLive: {
     title: "Você está transmitindo",
     message: "Sair do Relay e encerrar a transmissão?",

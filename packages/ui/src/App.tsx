@@ -57,6 +57,8 @@ type OpenDialog =
   | { kind: "settings" }
   /** Confirming Stop: ending it disconnects everyone watching. */
   | { kind: "stop" }
+  /** Confirming leaving a watched broadcast. */
+  | { kind: "leave"; code: string }
   /** `pending`: the code just submitted, while it connects. */
   | { kind: "watch"; pending?: string; error?: string };
 
@@ -128,8 +130,10 @@ export function App() {
         void document.exitFullscreen().catch(() => {});
         return true;
       }
-      if (!canGoBack(navRef.current)) return false;
-      dispatch({ type: "back" });
+      // Back leaves the watched broadcast in focus, after confirming.
+      const { focus } = navRef.current;
+      if (!canGoBack(navRef.current) || focus === null) return false;
+      setDialog({ kind: "leave", code: focus });
       return true;
     });
   }, [platform]);
@@ -178,7 +182,7 @@ export function App() {
             notice={notice}
             onDismissNotice={() => dispatch({ type: "dismiss-notice" })}
             onFocus={(tile) => dispatch({ type: "focus", tile })}
-            onLeave={(code) => dispatch({ type: "left", code })}
+            onLeave={(code) => setDialog({ kind: "leave", code })}
             onStop={() => setDialog({ kind: "stop" })}
             onRetry={() => dispatch({ type: "retry" })}
             onAddWatch={() => setDialog({ kind: "watch" })}
@@ -255,6 +259,32 @@ export function App() {
         >
           <p className={styles.quitMessage}>{t.stopLive.message}</p>
           <p className={styles.quitDetail}>{t.stopLive.detail}</p>
+        </Dialog>
+      )}
+
+      {dialog?.kind === "leave" && (
+        <Dialog
+          title={t.leaveLive.title}
+          onClose={closeDialog}
+          footer={
+            <>
+              <Button variant="secondary" onClick={closeDialog}>
+                {t.leaveLive.cancel}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  setDialog(null);
+                  dispatch({ type: "left", code: dialog.code });
+                }}
+              >
+                {t.leaveLive.confirm}
+              </Button>
+            </>
+          }
+        >
+          <p className={styles.quitMessage}>{t.leaveLive.message(dialog.code)}</p>
+          <p className={styles.quitDetail}>{t.leaveLive.detail}</p>
         </Dialog>
       )}
 

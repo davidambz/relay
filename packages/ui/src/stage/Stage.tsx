@@ -414,14 +414,22 @@ export function Stage({
             )}
           </div>
           <div className={styles.barEnd}>
-            {watchedFocus && (
-              <>
-                <BarButton label={t.stage.leave} onClick={() => onLeave(watchedFocus)}>
-                  <LeaveIcon />
-                </BarButton>
-                <span className={styles.barDivider} aria-hidden />
-              </>
+            {others.length > 0 && (
+              <BarButton
+                label={stripHidden ? t.stage.showStrip(others.length) : t.stage.hideStrip}
+                onClick={() => setStripHidden(!stripHidden)}
+                pressed={stripHidden}
+              >
+                <StripIcon />
+                {stripHidden && <span className={styles.hiddenCount}>{others.length}</span>}
+              </BarButton>
             )}
+            {watchedFocus && (
+              <BarButton label={t.stage.leave} onClick={() => onLeave(watchedFocus)}>
+                <LeaveIcon />
+              </BarButton>
+            )}
+            {(watchedFocus || others.length > 0) && <span className={styles.barDivider} aria-hidden />}
             {focusAudio && (
               <>
                 <BarButton
@@ -445,16 +453,6 @@ export function Stage({
                   />
                 )}
               </>
-            )}
-            {others.length > 0 && (
-              <BarButton
-                label={stripHidden ? t.stage.showStrip(others.length) : t.stage.hideStrip}
-                onClick={() => setStripHidden(!stripHidden)}
-                pressed={stripHidden}
-              >
-                <StripIcon />
-                {stripHidden && <span className={styles.hiddenCount}>{others.length}</span>}
-              </BarButton>
             )}
             {canFloat && (
               <BarButton label={t.viewing.miniPlayer} onClick={openFloating}>
