@@ -42,3 +42,34 @@
   gap: var(--space-4);
   min-width: 0;
 }
+
+/* A small machined key, like the dialogs' close button. */
+.settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  margin: calc((var(--touch-target) - 32px) / -2) 0;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.settings svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+}
+
+.settings:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

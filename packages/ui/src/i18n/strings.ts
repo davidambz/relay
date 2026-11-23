@@ -135,6 +135,13 @@ export interface Strings {
     timeout: string;
     network: string;
   };
+  settings: {
+    title: string;
+    logsHeading: string;
+    logsDescription: string;
+    openLogs: string;
+    openLogsFailed: string;
+  };
   updates: {
     heading: string;
     currentVersion: (version: string) => string;

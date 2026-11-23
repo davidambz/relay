@@ -30,3 +30,18 @@ describe("Header", () => {
     expect(container.querySelector(".lamp")?.getAttribute("data-lit")).toBe(lit);
   });
 });
+
+describe("Header settings", () => {
+  it("opens the settings from the gear", async () => {
+    const onSettings = vi.fn();
+    render(
+      <PlatformContext.Provider value={fakePlatform()}>
+        <I18nProvider>
+          <Header status="idle" onSettings={onSettings} />
+        </I18nProvider>
+      </PlatformContext.Provider>,
+    );
+    (await screen.findByRole("button", { name: "Settings" })).click();
+    expect(onSettings).toHaveBeenCalled();
+  });
+});

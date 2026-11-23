@@ -125,6 +125,14 @@ export const en: Strings = {
     timeout: "Couldn't receive the video. A firewall or the network may be blocking the connection.",
     network: "Couldn't reach the connection server. Check your internet and try again.",
   },
+  settings: {
+    title: "Settings",
+    logsHeading: "Logs",
+    logsDescription:
+      "Relay keeps a record of what happens to its connections, to make sense of drops. It stays on this computer and nothing is sent. If something goes wrong, open the folder and send relay.log to whoever is helping.",
+    openLogs: "Open log folder",
+    openLogsFailed: "Couldn't open the log folder.",
+  },
   updates: {
     heading: "Updates",
     currentVersion: (version) => `Relay ${version}`,

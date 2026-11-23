@@ -125,6 +125,14 @@ export const ptBR: Strings = {
     timeout: "Não foi possível receber o vídeo. Um firewall ou a rede pode estar bloqueando a conexão.",
     network: "Não foi possível falar com o servidor de conexão. Confira sua internet e tente de novo.",
   },
+  settings: {
+    title: "Configurações",
+    logsHeading: "Logs",
+    logsDescription:
+      "O Relay guarda um registro do que acontece com as conexões, para entender quedas. Ele fica só neste computador e nada é enviado. Se algo der errado, abra a pasta e mande o arquivo relay.log para quem for ajudar.",
+    openLogs: "Abrir pasta de logs",
+    openLogsFailed: "Não foi possível abrir a pasta de logs.",
+  },
   updates: {
     heading: "Atualizações",
     currentVersion: (version) => `Relay ${version}`,

@@ -54,8 +54,9 @@ describe("UpdatesPanel", () => {
     expect(screen.getByRole("button", { name: "Check for updates" })).toBeDisabled();
   });
 
-  it("renders nothing where the shell can't self-update", () => {
+  it("only shows the version where the shell can't self-update", () => {
     setup({ state: "idle" }, false);
-    expect(screen.queryByText("Updates")).not.toBeInTheDocument();
+    expect(screen.getByText("Relay 0.3.0")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
