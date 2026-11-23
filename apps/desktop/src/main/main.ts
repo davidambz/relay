@@ -13,6 +13,8 @@ import { isAudioAvailable, startAudio, stopAllAudio, stopAudio } from "./audio";
 import { applyUpdate, checkForUpdate, getUpdateStatus, installOnQuit, scheduleUpdateChecks, setSessionActive } from "./updater";
 import { createTray, type RelayTray } from "./tray";
 import { watchForeground, type ForegroundState } from "./foregroundWatch";
+import { log, logStartup, openLogFolder, writeLog } from "./logger";
+import { parseLogEntry } from "@relay/core";
 
 // null: an installed Relay is already running; it gets "second-instance"
 // and shows itself, and this copy just quits.
@@ -87,6 +89,7 @@ function registerIpc() {
     if (typeof sourceId !== "string") throw new Error("sourceId must be a string");
     const { id, mode } = await startAudio(event.sender, sourceId);
     console.log("System audio:", mode.kind, "pid" in mode ? mode.pid : "");
+    log.info("audio", "System audio started", { mode: mode.kind });
     return id;
   });
   ipcMain.handle(IPC.audioStop, (event, captureId: unknown) =>
@@ -108,6 +111,11 @@ function registerIpc() {
     setSessionActive(currentSession !== null);
     tray?.setSession(currentSession);
   });
+  ipcMain.on(IPC.log, (_event, value: unknown) => {
+    const entry = parseLogEntry(value);
+    if (entry) writeLog(entry);
+  });
+  ipcMain.handle(IPC.openLogFolder, () => openLogFolder());
   ipcMain.handle(IPC.copyText, (_event, text: unknown) => {
     if (typeof text !== "string" || text.length > 1000) throw new Error("copyText expects a short string");
     clipboard.writeText(text);
@@ -203,6 +211,9 @@ function createWindow() {
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
   });
+  window.webContents.on("render-process-gone", (_event, details) =>
+    log.error("app", "The page crashed", { reason: details.reason, exitCode: details.exitCode }),
+  );
   // The X hides Relay to the tray instead of quitting, so a broadcast
   // keeps going; the tray's Quit (or quitting from anywhere) closes it.
   window.on("close", (event) => {
@@ -500,6 +511,7 @@ app.on("second-instance", () => showApp());
 
 app.whenReady().then(() => {
   if (instanceNumber === null) return;
+  logStartup(instanceNumber);
   tray = createTray({
     onOpen: showApp,
     onQuit: () => app.quit(),

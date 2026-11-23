@@ -46,6 +46,8 @@ const api: RelayDesktopApi = {
   storeGet: (key) => ipcRenderer.invoke(IPC.storeGet, key),
   storeSet: (key, value) => ipcRenderer.invoke(IPC.storeSet, key, value),
   copyText: (text) => ipcRenderer.invoke(IPC.copyText, text),
+  log: (entry) => ipcRenderer.send(IPC.log, entry),
+  openLogFolder: () => ipcRenderer.invoke(IPC.openLogFolder),
   onFloatingHover(listener) {
     const handler = (_event: IpcRendererEvent, hovered: boolean) => listener(hovered);
     ipcRenderer.on(IPC.floatingHover, handler);

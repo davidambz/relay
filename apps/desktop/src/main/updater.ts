@@ -13,6 +13,7 @@ import { app, BrowserWindow, net } from "electron";
 import { evaluateRelease, type UpdateCheck } from "@relay/core";
 import type { UpdateStatus } from "@relay/core";
 import { IPC } from "../shared/api";
+import { log } from "./logger";
 
 // Self-update, same mechanism as Umbra's updater.cpp: GitHub's latest
 // release is checked on start, every 24 h and on demand; applying an
@@ -63,10 +64,18 @@ export async function checkForUpdate(): Promise<UpdateCheck> {
     check = { status: "failed", reason: error instanceof Error ? error.message : String(error) };
   }
   lastCheck = check;
+  if (check.status === "failed") log.warn("updates", "Check failed", { reason: check.reason });
+  else log.info("updates", "Checked", { status: check.status, latest: check.latestVersion });
   // Fetch the installer in the background, so applying (or quitting)
   // later doesn't have to wait for it.
   if (check.status === "available" && app.isPackaged) {
-    void prepareInstaller(check).catch((error) => console.warn("Couldn't download the update", error));
+    void prepareInstaller(check).then(
+      () => log.info("updates", "Installer downloaded", { version: check.latestVersion }),
+      (error) => {
+        log.warn("updates", "Download failed", { reason: error instanceof Error ? error.message : String(error) });
+        console.warn("Couldn't download the update", error);
+      },
+    );
   }
   setStatus(
     check.status === "available"
@@ -111,6 +120,7 @@ function prepareInstaller(check: Extract<UpdateCheck, { status: "available" }>):
 
 function launchInstaller(file: string, relaunch: boolean) {
   installerLaunched = true;
+  log.info("updates", "Installing", { version: prepared?.version, relaunch });
   const args = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"];
   if (relaunch) args.push("/RELAUNCH");
   spawn(file, args, { detached: true, stdio: "ignore" }).unref();

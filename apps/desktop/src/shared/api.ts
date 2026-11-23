@@ -5,7 +5,7 @@
 // renderer's PlatformDesktop adapter. Kept tiny and serializable: the
 // renderer never sees Electron or Node objects.
 
-import type { CaptureSource, SessionKind, Theme, UpdateStatus } from "@relay/core";
+import type { CaptureSource, LogEntry, SessionKind, Theme, UpdateStatus } from "@relay/core";
 
 export interface InstanceInfo {
   /** 1 for the first copy running, 2+ for extra copies (separate profile). */
@@ -43,6 +43,9 @@ export interface RelayDesktopApi {
   storeGet(key: string): Promise<unknown>;
   storeSet(key: string, value: unknown): Promise<void>;
   copyText(text: string): Promise<void>;
+  /** Appends to the log file (main redacts and rate-limits). */
+  log(entry: LogEntry): void;
+  openLogFolder(): Promise<void>;
   /** Mouse entering/leaving the mini player window (polled by main). */
   onFloatingHover(listener: (hovered: boolean) => void): () => void;
 }
@@ -67,4 +70,6 @@ export const IPC = {
   quitRequest: "quit:request",
   quitAnswer: "quit:answer",
   floatingHover: "floating:hover",
+  log: "log:write",
+  openLogFolder: "log:open-folder",
 } as const;

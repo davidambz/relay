@@ -64,5 +64,7 @@ export function createDesktopPlatform(api: RelayDesktopApi = window.relay): Plat
         );
       }),
     onFloatingHover: (listener) => api.onFloatingHover(listener),
+    log: (entry) => api.log(entry),
+    openLogFolder: () => api.openLogFolder(),
   };
 }
