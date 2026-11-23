@@ -61,6 +61,7 @@ export function useHostSession(
       if (disposed) return;
       session = new HostSession(stream, config, createPeer, {
         ...latestEncoder.current,
+        log: platform.log,
         onViewersChange: (viewers) =>
           update((current) => (current.status === "live" ? { ...current, viewers } : current)),
         onSignalingChange: (signaling) =>

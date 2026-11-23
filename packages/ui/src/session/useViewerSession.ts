@@ -30,6 +30,7 @@ export function useViewerSession(code: string): ViewerState {
         onEnd: (reason) => {
           if (!disposed) setState({ status: "ended", reason });
         },
+        log: platform.log,
       });
       session.connect();
     });
