@@ -14,18 +14,25 @@ interface HomeProps {
   onWatch: () => void;
   /** Why the last session ended, if it did. */
   notice?: string;
+  /** Something to do about it (watch a dropped broadcast again). */
+  noticeAction?: { label: string; onClick: () => void };
 }
 
 /** Shown while nothing is running: broadcast or watch. */
-export function Home({ onBroadcast, onWatch, notice }: HomeProps) {
+export function Home({ onBroadcast, onWatch, notice, noticeAction }: HomeProps) {
   const { t } = useI18n();
   const platform = usePlatform();
 
   return (
     <div className={screen.screen}>
       {notice && (
-        <p className={screen.note} role="status">
-          {notice}
+        <p className={[screen.note, styles.notice].join(" ")} role="status">
+          <span>{notice}</span>
+          {noticeAction && (
+            <Button variant="secondary" onClick={noticeAction.onClick}>
+              {noticeAction.label}
+            </Button>
+          )}
         </p>
       )}
       <UpdateNotice />

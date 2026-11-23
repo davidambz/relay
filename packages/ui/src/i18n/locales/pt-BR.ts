@@ -92,6 +92,7 @@ export const ptBR: Strings = {
     inMiniPlayer: "Tocando no mini player",
     startFailed: "Não foi possível falar com o servidor de conexão. Confira sua internet e tente de novo.",
     retry: "Tentar de novo",
+    watchAgain: "Tentar de novo",
     reconnecting: "Reconectando ao servidor. Quem já está assistindo continua assistindo.",
     switchFailed: "Não foi possível trocar a fonte. A transmissão continua com a fonte anterior.",
     sourceEnded: "A janela compartilhada foi fechada, então a sua transmissão acabou.",
@@ -124,6 +125,7 @@ export const ptBR: Strings = {
     notFound: "Ninguém está transmitindo com esse código. Confira e tente de novo.",
     timeout: "Não foi possível receber o vídeo. Um firewall ou a rede pode estar bloqueando a conexão.",
     network: "Não foi possível falar com o servidor de conexão. Confira sua internet e tente de novo.",
+    lost: "A conexão caiu e não deu para voltar.",
   },
   settings: {
     title: "Configurações",
@@ -146,6 +148,7 @@ export const ptBR: Strings = {
   },
   viewing: {
     connecting: (code) => `Conectando a ${code}…`,
+    reconnecting: (code) => `Reconectando a ${code}…`,
     mute: "Silenciar (M)",
     unmute: "Ativar som (M)",
     volume: "Volume",

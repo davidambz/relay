@@ -34,6 +34,7 @@ function endReasonText(reason: Exclude<ViewerEndReason, "left">, t: Strings): st
     "not-found": t.watch.notFound,
     timeout: t.watch.timeout,
     network: t.watch.network,
+    lost: t.watch.lost,
   }[reason];
 }
 
@@ -168,6 +169,14 @@ export function App() {
 
   const ownCode = broadcast?.host.status === "live" ? broadcast.host.code : undefined;
   const notice = noticeText(nav.notice, t);
+  // A broadcast that dropped (rather than ended) can be tried again in one click.
+  const droppedCode =
+    nav.notice?.kind === "viewer-ended" && ["lost", "network", "timeout"].includes(nav.notice.reason)
+      ? nav.notice.code
+      : undefined;
+  const noticeAction = droppedCode
+    ? { label: t.stage.watchAgain, onClick: () => dispatch({ type: "watch", code: droppedCode }) }
+    : undefined;
   const canHost = platform.capabilities.host;
   const closeDialog = () => setDialog(null);
   // Dialogs live outside the stage; in fullscreen they'd open unseen.
@@ -184,6 +193,7 @@ export function App() {
         {view.screen === "home" ? (
           <Home
             notice={notice}
+            noticeAction={noticeAction}
             onBroadcast={() => setDialog({ kind: "go-live" })}
             onWatch={() => setDialog({ kind: "watch" })}
           />
@@ -195,6 +205,7 @@ export function App() {
             viewers={viewers}
             volumes={volumes}
             notice={notice}
+            noticeAction={noticeAction}
             onDismissNotice={() => dispatch({ type: "dismiss-notice" })}
             onFocus={(tile) => dispatch({ type: "focus", tile })}
             onLeave={(code) => openDialog({ kind: "leave", code })}

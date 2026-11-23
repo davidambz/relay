@@ -8,24 +8,34 @@ import { PlatformContext } from "../platform/PlatformContext";
 import { AUTO_HIDE_MS } from "../player/useAutoHide";
 import { useVolumes } from "../player/useVolume";
 import { fakePlatform } from "../test/fakePlatform";
+import type { ViewerState } from "../session/useViewerSession";
 import { Stage } from "./Stage";
 
 const CODES = ["ABC234"];
 
 interface Options {
+  viewer?: ViewerState;
   storage?: Map<string, unknown>;
   platform?: Partial<Platform>;
   pictureInPicture?: boolean;
 }
 
-function StageWithVolumes({ pictureInPicture, onLeave }: { pictureInPicture?: boolean; onLeave: (code: string) => void }) {
+function StageWithVolumes({
+  pictureInPicture,
+  onLeave,
+  viewer = { status: "connecting" },
+}: {
+  pictureInPicture?: boolean;
+  onLeave: (code: string) => void;
+  viewer?: ViewerState;
+}) {
   const volumes = useVolumes(CODES);
   return (
     <Stage
       tiles={["ABC234"]}
       focus="ABC234"
       broadcast={null}
-      viewers={{ ABC234: { status: "connecting" } }}
+      viewers={{ ABC234: viewer }}
       volumes={volumes}
       onDismissNotice={() => {}}
       onFocus={() => {}}
@@ -41,7 +51,7 @@ function StageWithVolumes({ pictureInPicture, onLeave }: { pictureInPicture?: bo
   );
 }
 
-function renderStage({ storage = new Map(), platform: overrides = {}, pictureInPicture = false }: Options = {}) {
+function renderStage({ storage = new Map(), platform: overrides = {}, pictureInPicture = false, viewer }: Options = {}) {
   const platform = fakePlatform({
     storage: {
       get: async <T,>(key: string) => storage.get(key) as T | undefined,
@@ -53,7 +63,7 @@ function renderStage({ storage = new Map(), platform: overrides = {}, pictureInP
   const ui = (pip: boolean) => (
     <PlatformContext.Provider value={platform}>
       <I18nProvider>
-        <StageWithVolumes pictureInPicture={pip} onLeave={onLeave} />
+        <StageWithVolumes pictureInPicture={pip} onLeave={onLeave} viewer={viewer} />
         <input aria-label="elsewhere" />
       </I18nProvider>
     </PlatformContext.Provider>
@@ -119,6 +129,11 @@ describe("Stage", () => {
     fireEvent.change(slider, { target: { value: "0.6" } });
     expect(storage.get("player.volume")).toBe(0.6);
     expect(screen.getByRole("button", { name: "Mute (M)" })).toBeInTheDocument();
+  });
+
+  it("says it's reconnecting while a dropped broadcast comes back", async () => {
+    renderStage({ viewer: { status: "reconnecting" } });
+    expect(await screen.findByText("Reconnecting to ABC234…")).toBeInTheDocument();
   });
 
   it("opens the mini player with its button and P", async () => {
