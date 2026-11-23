@@ -27,6 +27,11 @@
 
         </activity>
 
+        <!-- Self-update: PackageInstaller reports back here. -->
+        <receiver
+            android:name=".InstallReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -41,4 +46,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Self-update: wait for Wi-Fi rather than use mobile data, and install the new APK. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 </manifest>

@@ -4,6 +4,7 @@
 import { App } from "@capacitor/app";
 import type { KeyValueStore, Platform, Theme } from "@relay/core";
 import { RelayPip, RelayScreen } from "./pip";
+import { createMobileUpdates } from "./updater";
 
 function prefersDark(): MediaQueryList {
   return window.matchMedia("(prefers-color-scheme: dark)");
@@ -28,14 +29,22 @@ const storage: KeyValueStore = {
 
 /**
  * PlatformMobile: viewer-only. Broadcasting from a phone needs native
- * screen capture (MediaProjection) and isn't part of this app yet; updates
- * come as new APKs from GitHub Releases, not self-installed.
+ * screen capture (MediaProjection) and isn't part of this app yet. Updates
+ * come as new APKs from GitHub Releases, fetched and installed by the app
+ * itself (updater.ts).
  */
 export function createMobilePlatform(appVersion: string): Platform {
+  // A dev build (0.0.0) has nothing to update to.
+  const updates = appVersion === "0.0.0" ? undefined : createMobileUpdates(appVersion);
+  if (updates) {
+    updates.start();
+    void App.addListener("resume", () => updates.resumed());
+  }
   return {
     kind: "mobile",
     appVersion,
-    capabilities: { host: false, systemAudio: false, floating: "pip", selfUpdate: false },
+    capabilities: { host: false, systemAudio: false, floating: "pip", selfUpdate: updates !== undefined },
+    updates,
     async getSystemTheme(): Promise<Theme> {
       return prefersDark().matches ? "dark" : "light";
     },
@@ -54,6 +63,8 @@ export function createMobilePlatform(appVersion: string): Platform {
       await RelayPip.enter();
     },
     setSession(session) {
+      // Never fetch or install an update under a broadcast.
+      updates?.setSessionActive(session !== null);
       // While watching: Home turns the app into a PiP window, screen stays on.
       void RelayPip.setWatching({ active: session === "watching" }).catch(() => {});
     },
