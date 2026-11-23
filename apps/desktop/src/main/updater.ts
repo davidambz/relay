@@ -41,9 +41,37 @@ export function getUpdateStatus(): UpdateStatus {
   return status;
 }
 
-/** A broadcast or a viewer session is running: never restart under it. */
+/**
+ * A broadcast or a viewer session is running: never restart under it, and
+ * never download under it either (the installer is ~100 MB, competing
+ * with the stream for the connection). A download in progress is called
+ * off, and the update is fetched once nothing is running.
+ */
 export function setSessionActive(active: boolean) {
+  if (active === sessionActive) return;
   sessionActive = active;
+  if (active) {
+    if (prepared && !prepared.ready) {
+      log.info("updates", "Download paused for a session");
+      prepared.abort.abort();
+    }
+  } else {
+    downloadInBackground();
+  }
+}
+
+/** Fetches the available update's installer, unless a session is running. */
+function downloadInBackground() {
+  const check = lastCheck;
+  if (check?.status !== "available" || !app.isPackaged || sessionActive) return;
+  void prepareInstaller(check).then(
+    () => log.info("updates", "Installer downloaded", { version: check.latestVersion }),
+    (error) => {
+      if (error instanceof Error && error.name === "AbortError") return;
+      log.warn("updates", "Download failed", { reason: error instanceof Error ? error.message : String(error) });
+      console.warn("Couldn't download the update", error);
+    },
+  );
 }
 
 export async function checkForUpdate(): Promise<UpdateCheck> {
@@ -66,17 +94,9 @@ export async function checkForUpdate(): Promise<UpdateCheck> {
   lastCheck = check;
   if (check.status === "failed") log.warn("updates", "Check failed", { reason: check.reason });
   else log.info("updates", "Checked", { status: check.status, latest: check.latestVersion });
-  // Fetch the installer in the background, so applying (or quitting)
-  // later doesn't have to wait for it.
-  if (check.status === "available" && app.isPackaged) {
-    void prepareInstaller(check).then(
-      () => log.info("updates", "Installer downloaded", { version: check.latestVersion }),
-      (error) => {
-        log.warn("updates", "Download failed", { reason: error instanceof Error ? error.message : String(error) });
-        console.warn("Couldn't download the update", error);
-      },
-    );
-  }
+  // Fetch the installer in the background (not during a session), so
+  // applying or quitting later doesn't have to wait for it.
+  downloadInBackground();
   setStatus(
     check.status === "available"
       ? { state: "available", latestVersion: check.latestVersion }
@@ -91,17 +111,19 @@ export async function checkForUpdate(): Promise<UpdateCheck> {
  * The verified installer for one version, downloaded at most once. Kept
  * on disk so quitting can hand off to it instantly (see installOnQuit).
  */
-let prepared: { version: string; file: Promise<string>; ready: string | null } | null = null;
+let prepared: { version: string; file: Promise<string>; ready: string | null; abort: AbortController } | null = null;
 let installerLaunched = false;
 
 function prepareInstaller(check: Extract<UpdateCheck, { status: "available" }>): Promise<string> {
   if (prepared?.version === check.latestVersion) return prepared.file;
   // Unique name: never reuse a file another run may still be writing.
   const installer = path.join(os.tmpdir(), `${INSTALLER_FILE_PREFIX}${process.pid}-${Date.now()}.exe`);
+  const abort = new AbortController();
   const entry: NonNullable<typeof prepared> = {
     version: check.latestVersion,
     ready: null,
-    file: download(check.downloadUrl, installer, check.sha256).then(
+    abort,
+    file: download(check.downloadUrl, installer, check.sha256, abort.signal).then(
       () => {
         entry.ready = installer;
         return installer;
@@ -163,8 +185,8 @@ export function installOnQuit() {
  * block the main process on one big synchronous write), hashing it on the
  * way. With a known SHA-256, a mismatch fails the update.
  */
-async function download(url: string, file: string, sha256: string | undefined): Promise<void> {
-  const response = await net.fetch(url, { headers: { "User-Agent": "Relay-Updater" } });
+async function download(url: string, file: string, sha256: string | undefined, signal: AbortSignal): Promise<void> {
+  const response = await net.fetch(url, { headers: { "User-Agent": "Relay-Updater" }, signal });
   if (!response.ok || !response.body) throw new Error(`Download failed with ${response.status}`);
   const hash = createHash("sha256");
   const hashing = new Transform({
@@ -173,7 +195,7 @@ async function download(url: string, file: string, sha256: string | undefined): 
       callback(null, chunk);
     },
   });
-  await pipeline(Readable.fromWeb(response.body as WebReadableStream), hashing, fs.createWriteStream(file));
+  await pipeline(Readable.fromWeb(response.body as WebReadableStream), hashing, fs.createWriteStream(file), { signal });
   const actual = hash.digest("hex");
   if (sha256 && actual !== sha256) throw new Error("The downloaded installer doesn't match its published checksum");
 }
