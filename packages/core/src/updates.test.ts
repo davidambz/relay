@@ -1,7 +1,7 @@
 // Relay — Copyright (C) 2026 David Ambrozio
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { evaluateRelease as evaluate, isNewerVersion, parseSha256Digest, parseVersion } from "./updates";
+import { ANDROID_APK, evaluateRelease as evaluate, isNewerVersion, parseSha256Digest, parseVersion } from "./updates";
 
 const REPO = "davidambz/relay";
 const URL = `https://github.com/${REPO}/releases/download/v0.2.0/RelaySetup-0.2.0.exe`;
@@ -76,5 +76,20 @@ describe("parseSha256Digest", () => {
     for (const bad of [undefined, null, "", "sha256:abc", `sha512:${"0f".repeat(32)}`, `${"0f".repeat(32)}`]) {
       expect(parseSha256Digest(bad)).toBeUndefined();
     }
+  });
+});
+
+describe("evaluateRelease for the Android app", () => {
+  it("picks the APK, never the Windows installer", () => {
+    const apk = `https://github.com/${REPO}/releases/download/v0.2.0/Relay-0.2.0.apk`;
+    const release = {
+      tag_name: "v0.2.0",
+      assets: [
+        { name: "RelaySetup-0.2.0.exe", browser_download_url: URL },
+        { name: "Relay-0.2.0.apk", browser_download_url: apk },
+      ],
+    };
+    expect(evaluate("0.1.0", release, REPO, ANDROID_APK)).toEqual({ status: "available", latestVersion: "0.2.0", downloadUrl: apk });
+    expect(evaluate("0.1.0", { ...release, assets: [release.assets[0]] }, REPO, ANDROID_APK)).toEqual({ status: "up-to-date" });
   });
 });

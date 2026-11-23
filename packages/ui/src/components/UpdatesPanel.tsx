@@ -27,7 +27,10 @@ export function UpdatesPanel() {
         return t.updates.upToDate;
       case "available":
         return t.updates.available(status.latestVersion);
+      case "ready":
+        return t.updates.ready(status.latestVersion);
       case "downloading":
+        return t.updates.downloading(status.latestVersion);
       case "installing":
         return t.updates.installing(status.latestVersion);
       case "failed":
@@ -52,9 +55,9 @@ export function UpdatesPanel() {
           )}
         </div>
         {updates &&
-          (status.state === "available" ? (
+          (status.state === "available" || status.state === "ready" ? (
             <Button variant="primary" onClick={() => void updates.apply().catch(() => {})}>
-              {t.updates.updateNow}
+              {status.state === "ready" ? t.updates.installNow : t.updates.updateNow}
             </Button>
           ) : (
             <Button variant="secondary" onClick={() => void updates.check()} disabled={busy}>

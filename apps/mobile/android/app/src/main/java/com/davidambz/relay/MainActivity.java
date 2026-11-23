@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(PipPlugin.class);
         registerPlugin(ScreenPlugin.class);
+        registerPlugin(UpdaterPlugin.class);
         super.onCreate(savedInstanceState);
         // The stream arrives a moment after the tap on "Watch"; let it start
         // playing (with sound) without needing a second gesture.

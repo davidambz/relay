@@ -25,13 +25,15 @@ Built for watching a friend's screen during a voice call: the broadcast can carr
 - Mini player:
   - Windows: a small always-on-top window;
   - Android: system Picture-in-Picture, entered automatically when you leave the app mid-broadcast.
+- If the connection drops, Relay gets the picture back by itself, with no code to type again. Volume and mute are remembered for each broadcast.
 - Clear messages for a wrong code, a full broadcast, a broadcast that ended, and a connection that can't get through.
 
 **Everywhere**
 
 - English and Brazilian Portuguese, following the system language.
 - Light and dark themes, following the system theme.
-- Silent self-updates on Windows from GitHub Releases, never while you're broadcasting or watching.
+- Self-updates from GitHub Releases, downloaded in the background and never while you're broadcasting or watching. On Android they wait for Wi-Fi unless you tap Update.
+- Settings (the gear at the top): version and updates, and on Windows a log file for figuring out dropped connections. It never holds full share codes or IP addresses, and nothing is sent anywhere.
 
 ### Keyboard shortcuts (player)
 
@@ -45,11 +47,13 @@ Every shortcut also has a button.
 
 ## Installing
 
-**Windows 10 2004 (build 19041) or later, or Windows 11, x64.** Download `RelaySetup-X.Y.Z.exe` from the [latest release](https://github.com/davidambz/relay/releases/latest) and run it. It installs per user, without admin rights. Relay checks for updates at startup, once a day and from the Updates panel.
+**Windows 10 2004 (build 19041) or later, or Windows 11, x64.** Download `RelaySetup-X.Y.Z.exe` from the [latest release](https://github.com/davidambz/relay/releases/latest) and run it. It installs per user, without admin rights. Relay checks for updates at startup, once a day and from Settings.
 
 The installer isn't code-signed yet, so Windows SmartScreen may warn the first time; choose *More info → Run anyway*.
 
-**Android 7.0 or later (viewer only).** There's no store release yet. Each push to `main` builds a debug APK, available as the `relay-android-debug` artifact of the [Android workflow](https://github.com/davidambz/relay/actions/workflows/android.yml).
+**Android 7.0 or later (viewer only).** There's no store release yet. Download `Relay-X.Y.Z.apk` from the [latest release](https://github.com/davidambz/relay/releases/latest) and open it (Android asks to allow installing apps from your browser or file manager). From then on Relay updates itself: the first update asks to allow Relay to install apps, and on Android 12 or later the next ones install without asking.
+
+A debug build installed from the `relay-android-debug` artifact of the [Android workflow](https://github.com/davidambz/relay/actions/workflows/android.yml) is signed with a different key, so it has to be uninstalled before installing a release APK.
 
 ## How it works
 

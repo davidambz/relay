@@ -54,6 +54,8 @@ export type UpdateStatus =
   | { state: "checking" }
   | { state: "up-to-date" }
   | { state: "available"; latestVersion: string }
+  /** Downloaded and verified: installing is quick. */
+  | { state: "ready"; latestVersion: string }
   | { state: "downloading"; latestVersion: string }
   | { state: "installing"; latestVersion: string }
   | { state: "failed"; reason: string };
@@ -61,7 +63,10 @@ export type UpdateStatus =
 export interface UpdatesApi {
   getStatus(): Promise<UpdateStatus>;
   check(): Promise<void>;
-  /** Downloads and installs; the app restarts. Rejects during a session. */
+  /**
+   * Downloads (if not done yet) and installs; the app restarts. Rejects
+   * during a session.
+   */
   apply(): Promise<void>;
   onStatus(listener: (status: UpdateStatus) => void): () => void;
 }

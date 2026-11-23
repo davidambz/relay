@@ -153,6 +153,9 @@ export interface Strings {
     upToDate: string;
     available: (version: string) => string;
     updateNow: string;
+    downloading: (version: string) => string;
+    ready: (version: string) => string;
+    installNow: string;
     installing: (version: string) => string;
     failed: string;
   };

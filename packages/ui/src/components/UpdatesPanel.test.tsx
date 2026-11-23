@@ -48,6 +48,17 @@ describe("UpdatesPanel", () => {
     expect(updates.apply).toHaveBeenCalled();
   });
 
+  it("says when the download is under way and when it's ready", async () => {
+    const user = userEvent.setup();
+    const { updates, push } = setup({ state: "idle" });
+    push({ state: "downloading", latestVersion: "0.4.0" });
+    expect(screen.getByText("Downloading version 0.4.0…")).toBeInTheDocument();
+    push({ state: "ready", latestVersion: "0.4.0" });
+    expect(screen.getByText("Version 0.4.0 is ready to install.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Install now" }));
+    expect(updates.apply).toHaveBeenCalled();
+  });
+
   it("disables checking while busy", () => {
     const { push } = setup({ state: "idle" });
     push({ state: "checking" });
