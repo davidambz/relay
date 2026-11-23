@@ -213,36 +213,38 @@ export function GoLiveDialog({ onClose, onStarted, mode = "start", audio: fixedA
         </Button>
       </div>
 
-      {load.status === "loading" && <p className={screen.description}>{t.picker.loading}</p>}
-      {load.status === "failed" && (
-        <p className={screen.error} role="alert">
-          {t.picker.loadFailed}
-        </p>
-      )}
-      {load.status === "ready" && visible.length === 0 && <p className={screen.description}>{emptyText}</p>}
-      {visible.length > 0 && (
-        <ul className={styles.grid} aria-label={t.picker.sourceLabel}>
-          {visible.map((source) => {
-            const current = source.id === selected?.id;
-            return (
-              <li key={source.id} className={styles.cell}>
-                <button type="button" className={styles.card} data-current={current} onClick={() => choose(source)}>
-                  <span className={screen.bezel}>
-                    <img className={screen.screenArea} src={source.thumbnail} alt="" />
-                  </span>
-                  <span className={styles.chin}>
-                    {source.icon && <img className={styles.appIcon} src={source.icon} alt="" />}
-                    <span className={styles.name} title={source.name}>
-                      {source.name}
+      <div className={styles.sources}>
+        {load.status === "loading" && <p className={screen.description}>{t.picker.loading}</p>}
+        {load.status === "failed" && (
+          <p className={screen.error} role="alert">
+            {t.picker.loadFailed}
+          </p>
+        )}
+        {load.status === "ready" && visible.length === 0 && <p className={screen.description}>{emptyText}</p>}
+        {visible.length > 0 && (
+          <ul className={styles.grid} aria-label={t.picker.sourceLabel}>
+            {visible.map((source) => {
+              const current = source.id === selected?.id;
+              return (
+                <li key={source.id} className={styles.cell}>
+                  <button type="button" className={styles.card} data-current={current} onClick={() => choose(source)}>
+                    <span className={screen.bezel}>
+                      <img className={screen.screenArea} src={source.thumbnail} alt="" />
                     </span>
-                    <span className="lamp" data-lit={current} />
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                    <span className={styles.chin}>
+                      {source.icon && <img className={styles.appIcon} src={source.icon} alt="" />}
+                      <span className={styles.name} title={source.name}>
+                        {source.name}
+                      </span>
+                      <span className="lamp" data-lit={current} />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </Dialog>
   );
 }

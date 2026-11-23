@@ -13,6 +13,18 @@
   }
 }
 
+/* Takes what the fixed-height dialog leaves and scrolls; the gutter keeps
+   the cards from shifting when a scrollbar shows up. The padding is room
+   for the cards' glow, which the scroll area would clip. */
+.sources {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  margin: calc(-1 * var(--space-1));
+  padding: var(--space-1);
+}
+
 .grid {
   list-style: none;
   margin: 0;

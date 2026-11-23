@@ -24,7 +24,19 @@
 
 .panel[data-size="wide"] {
   width: min(820px, calc(100vw - var(--space-6)));
-  max-height: min(760px, calc(100vh - var(--space-6)));
+  /* A fixed height: what's inside loads and changes, and a panel growing
+     under the mouse makes clicks land on the wrong thing. */
+  height: min(600px, calc(100vh - var(--space-6)));
+  max-height: none;
+}
+
+/* The content lays itself out in that height and scrolls its own list. */
+.panel[data-size="wide"] .body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 @media (max-width: 520px) {
@@ -34,6 +46,7 @@
   }
   .panel[data-size="wide"] {
     width: calc(100vw - var(--space-4));
+    height: min(600px, calc(100vh - var(--space-4)));
   }
 }
 

@@ -12,7 +12,11 @@ interface DialogProps {
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
-  /** "wide" fits a grid of thumbnails (the source picker). */
+  /**
+   * "wide" fits a grid of thumbnails (the source picker). Its height is
+   * fixed, so it doesn't jump as its content loads; the content scrolls
+   * whatever needs scrolling.
+   */
   size?: "default" | "wide";
 }
 
