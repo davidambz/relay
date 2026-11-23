@@ -65,7 +65,13 @@ function downloadInBackground() {
   const check = lastCheck;
   if (check?.status !== "available" || !app.isPackaged || sessionActive) return;
   void prepareInstaller(check).then(
-    () => log.info("updates", "Installer downloaded", { version: check.latestVersion }),
+    () => {
+      log.info("updates", "Installer downloaded", { version: check.latestVersion });
+      // Ready to go: installing is now a quick restart.
+      if (status.state === "available" && status.latestVersion === check.latestVersion) {
+        setStatus({ state: "ready", latestVersion: check.latestVersion });
+      }
+    },
     (error) => {
       if (error instanceof Error && error.name === "AbortError") return;
       log.warn("updates", "Download failed", { reason: error instanceof Error ? error.message : String(error) });
@@ -99,7 +105,7 @@ export async function checkForUpdate(): Promise<UpdateCheck> {
   downloadInBackground();
   setStatus(
     check.status === "available"
-      ? { state: "available", latestVersion: check.latestVersion }
+      ? { state: prepared?.ready && prepared.version === check.latestVersion ? "ready" : "available", latestVersion: check.latestVersion }
       : check.status === "failed"
         ? { state: "failed", reason: check.reason }
         : { state: "up-to-date" },
