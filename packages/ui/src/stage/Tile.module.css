@@ -92,6 +92,15 @@
   color: #eef2f3;
 }
 
+.mutedChip {
+  color: #ff9aaa;
+}
+
+.mutedChip svg {
+  width: 14px;
+  height: 14px;
+}
+
 .liveChip {
   color: var(--visor-text);
 }

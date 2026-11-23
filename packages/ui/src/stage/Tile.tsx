@@ -99,6 +99,12 @@ export function Tile({
         </span>
       )}
       <span className={styles.chips}>
+        {variant === "focus" && !silent && muted && (
+          // Coming back muted must not read as a broadcast without sound.
+          <span className={[styles.chip, styles.mutedChip].join(" ")}>
+            <MutedIcon aria-hidden /> {t.stage.muted}
+          </span>
+        )}
         {variant === "focus" && format && <span className={[styles.chip, "tabularNums"].join(" ")}>{format}</span>}
         {live && (
           <span className={[styles.chip, styles.liveChip].join(" ")}>

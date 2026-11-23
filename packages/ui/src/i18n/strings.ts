@@ -93,6 +93,8 @@ export interface Strings {
     /** The person's own tile. */
     yourTile: (sourceName: string) => string;
     onAir: string;
+    /** On the big picture while its sound is off. */
+    muted: string;
     tilesLabel: string;
     showTile: (name: string) => string;
     inMiniPlayer: string;

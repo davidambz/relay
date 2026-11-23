@@ -86,6 +86,7 @@ export const en: Strings = {
     viewersCount: (count, max) => (max === undefined ? String(count) : `${count} of ${max}`),
     yourTile: (sourceName) => `${sourceName} (you)`,
     onAir: "Live",
+    muted: "Muted",
     tilesLabel: "Broadcasts",
     showTile: (name) => `Show ${name}`,
     inMiniPlayer: "Playing in the mini player",

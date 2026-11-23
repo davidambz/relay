@@ -86,6 +86,7 @@ export const ptBR: Strings = {
     viewersCount: (count, max) => (max === undefined ? String(count) : `${count} de ${max}`),
     yourTile: (sourceName) => `${sourceName} (você)`,
     onAir: "Ao vivo",
+    muted: "Sem som",
     tilesLabel: "Transmissões",
     showTile: (name) => `Ver ${name}`,
     inMiniPlayer: "Tocando no mini player",
