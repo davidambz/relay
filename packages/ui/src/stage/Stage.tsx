@@ -41,6 +41,8 @@ interface StageProps {
   viewers: Record<string, ViewerState>;
   volumes: Volumes;
   notice?: string;
+  /** Something to do about the notice (watch a dropped broadcast again). */
+  noticeAction?: { label: string; onClick: () => void };
   onDismissNotice: () => void;
   onFocus: (tile: string) => void;
   onLeave: (code: string) => void;
@@ -119,6 +121,7 @@ export function Stage({
   viewers,
   volumes,
   notice,
+  noticeAction,
   onDismissNotice,
   onFocus,
   onLeave,
@@ -271,7 +274,13 @@ export function Stage({
         live={state.status === "playing"}
         volume={audio.volume}
         muted={audio.muted}
-        placeholder={inMini ? t.stage.inMiniPlayer : t.viewing.connecting(tile)}
+        placeholder={
+          inMini
+            ? t.stage.inMiniPlayer
+            : state.status === "reconnecting"
+              ? t.viewing.reconnecting(tile)
+              : t.viewing.connecting(tile)
+        }
         onSelect={() => onFocus(tile)}
         onDoubleClick={isFocus ? () => void fullscreen.toggle() : undefined}
         videoRef={isFocus ? focusVideoRef : undefined}
@@ -344,6 +353,11 @@ export function Stage({
             {notice && (
               <p className={styles.note} role="status">
                 {notice}
+                {noticeAction && (
+                  <button type="button" className={styles.noteAction} onClick={noticeAction.onClick}>
+                    {noticeAction.label}
+                  </button>
+                )}
                 <button
                   type="button"
                   className={styles.noteDismiss}

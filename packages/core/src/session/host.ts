@@ -8,6 +8,7 @@ import type { SessionConfig } from "./config";
 import type { HostMessage } from "./messages";
 import type { DataConnectionLike, MediaConnectionLike, PeerError, PeerFactory, PeerLike } from "./peer";
 import { sessionSdpTransform } from "./sdp";
+import { signalingBackoffMs } from "./viewer";
 
 const MAX_CODE_ATTEMPTS = 5;
 /**
@@ -173,12 +174,23 @@ export class HostSession {
     peer.on("connection", (conn: DataConnectionLike) => this.acceptViewer(peer, conn));
     // Viewers never call us; refuse anything that tries.
     peer.on("call", (call: MediaConnectionLike) => call.close());
+    // Viewers already connected keep watching without the server; it's
+    // only needed for new ones. Reconnect with growing waits, so an
+    // outage isn't hammered with attempts.
+    let attempts = 0;
+    let retry: ReturnType<typeof setTimeout> | null = null;
     peer.on("disconnected", () => {
-      this.log("warn", "Lost the signaling server");
+      if (this.stopped || peer.destroyed) return;
+      this.log("warn", "Lost the signaling server", { attempt: attempts });
       this.events.onSignalingChange?.(false);
-      if (!this.stopped && !peer.destroyed) peer.reconnect();
+      if (retry) clearTimeout(retry);
+      retry = setTimeout(() => {
+        retry = null;
+        if (!this.stopped && !peer.destroyed && peer.disconnected) peer.reconnect();
+      }, signalingBackoffMs(attempts++));
     });
     peer.on("open", () => {
+      attempts = 0;
       this.log("info", "Signaling server back");
       this.events.onSignalingChange?.(true);
     });

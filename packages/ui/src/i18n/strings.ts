@@ -100,6 +100,8 @@ export interface Strings {
     inMiniPlayer: string;
     startFailed: string;
     retry: string;
+    /** On a dropped broadcast's note: watch the same code again. */
+    watchAgain: string;
     reconnecting: string;
     switchFailed: string;
     sourceEnded: string;
@@ -134,6 +136,7 @@ export interface Strings {
     notFound: string;
     timeout: string;
     network: string;
+    lost: string;
   };
   settings: {
     title: string;
@@ -155,6 +158,7 @@ export interface Strings {
   };
   viewing: {
     connecting: (code: string) => string;
+    reconnecting: (code: string) => string;
     mute: string;
     unmute: string;
     volume: string;

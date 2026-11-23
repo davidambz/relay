@@ -92,6 +92,7 @@ export const en: Strings = {
     inMiniPlayer: "Playing in the mini player",
     startFailed: "Couldn't reach the connection server. Check your internet and try again.",
     retry: "Try again",
+    watchAgain: "Try again",
     reconnecting: "Reconnecting to the server. Anyone already watching keeps watching.",
     switchFailed: "Couldn't switch the source. The broadcast carries on with the previous one.",
     sourceEnded: "The shared window was closed, so your broadcast ended.",
@@ -124,6 +125,7 @@ export const en: Strings = {
     notFound: "Nobody is broadcasting with that code. Check it and try again.",
     timeout: "Couldn't receive the video. A firewall or the network may be blocking the connection.",
     network: "Couldn't reach the connection server. Check your internet and try again.",
+    lost: "The connection dropped and couldn't be brought back.",
   },
   settings: {
     title: "Settings",
@@ -146,6 +148,7 @@ export const en: Strings = {
   },
   viewing: {
     connecting: (code) => `Connecting to ${code}…`,
+    reconnecting: (code) => `Reconnecting to ${code}…`,
     mute: "Mute (M)",
     unmute: "Unmute (M)",
     volume: "Volume",

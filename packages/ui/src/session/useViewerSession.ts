@@ -9,6 +9,8 @@ import { usePeerFactory } from "./PeerFactoryContext";
 export type ViewerState =
   | { status: "connecting" }
   | { status: "playing"; stream: MediaStream }
+  /** The picture dropped; the session is getting it back by itself. */
+  | { status: "reconnecting" }
   | { status: "ended"; reason: ViewerEndReason };
 
 /** Connects to a broadcast while mounted; leaving (unmount) disconnects. */
@@ -26,6 +28,9 @@ export function useViewerSession(code: string): ViewerState {
       session = new ViewerSession(code, config, createPeer, {
         onStream: (stream) => {
           if (!disposed) setState({ status: "playing", stream });
+        },
+        onReconnecting: () => {
+          if (!disposed) setState({ status: "reconnecting" });
         },
         onEnd: (reason) => {
           if (!disposed) setState({ status: "ended", reason });
