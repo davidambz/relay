@@ -7,5 +7,6 @@ export * from "./host";
 export * from "./messages";
 export * from "./quality";
 export * from "./sdp";
+export * from "./stats";
 export * from "./viewer";
 export type * from "./peer";
