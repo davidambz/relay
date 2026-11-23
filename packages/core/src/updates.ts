@@ -37,6 +37,17 @@ export type UpdateCheck =
 
 export const INSTALLER_PREFIX = "RelaySetup-";
 
+/** Which release asset a shell installs: name prefix and extension. */
+export interface ReleaseAssetKind {
+  prefix: string;
+  extension: string;
+}
+
+/** The Windows installer (Inno Setup). */
+export const WINDOWS_INSTALLER: ReleaseAssetKind = { prefix: INSTALLER_PREFIX, extension: ".exe" };
+/** The Android app, signed with the release key. */
+export const ANDROID_APK: ReleaseAssetKind = { prefix: "Relay-", extension: ".apk" };
+
 interface ReleaseAsset {
   name?: unknown;
   browser_download_url?: unknown;
@@ -68,14 +79,20 @@ export function parseSha256Digest(digest: unknown): string | undefined {
  * Decides what a GitHub "latest release" response means for this build.
  * A tag that isn't X.Y.Z counts as "nothing to offer", not an error (it's
  * a network response, not our own CI output), and so does a release whose
- * RelaySetup-*.exe isn't attached yet (the release workflow still running).
+ * installer (RelaySetup-*.exe, or the shell's own kind, such as the APK)
+ * isn't attached yet (the release workflow still running).
  *
  * The installer must be downloaded from `repo`'s own releases, since it's
  * run right after. Its SHA-256 comes along when GitHub reports a digest;
  * a missing digest isn't an error (it must never strand users on an old
  * version), but a present one is checked after the download.
  */
-export function evaluateRelease(currentVersion: string, release: unknown, repo: string): UpdateCheck {
+export function evaluateRelease(
+  currentVersion: string,
+  release: unknown,
+  repo: string,
+  asset: ReleaseAssetKind = WINDOWS_INSTALLER,
+): UpdateCheck {
   const current = parseVersion(currentVersion);
   if (!current) return { status: "failed", reason: `current version "${currentVersion}" isn't X.Y.Z` };
   if (typeof release !== "object" || release === null) return { status: "failed", reason: "unexpected response" };
@@ -89,11 +106,11 @@ export function evaluateRelease(currentVersion: string, release: unknown, repo: 
   const assets = (release as { assets?: unknown }).assets;
   const installer = Array.isArray(assets)
     ? (assets as ReleaseAsset[]).find(
-        (asset) =>
-          typeof asset.name === "string" &&
-          asset.name.startsWith(INSTALLER_PREFIX) &&
-          asset.name.toLowerCase().endsWith(".exe") &&
-          typeof asset.browser_download_url === "string",
+        (candidate) =>
+          typeof candidate.name === "string" &&
+          candidate.name.startsWith(asset.prefix) &&
+          candidate.name.toLowerCase().endsWith(asset.extension) &&
+          typeof candidate.browser_download_url === "string",
       )
     : undefined;
   // Nothing to offer yet; the release workflow is likely still attaching it.
