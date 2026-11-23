@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { GripIcon, MutedIcon, ReturnIcon, VolumeIcon } from "../components/icons";
+import { MutedIcon, ReturnIcon, VolumeIcon } from "../components/icons";
 import { useI18n } from "../i18n/I18nContext";
 import { usePlatform } from "../platform/PlatformContext";
 import { actionForKey } from "./shortcuts";
@@ -20,15 +20,16 @@ interface FloatingPlayerProps {
 /**
  * The mini player's content, portaled into the floating window.
  *
- * Its controls (mute, volume, a drag grip, back to the main window) show
- * only while the mouse is over the window, and stay out of the picture
- * otherwise. There's deliberately no "leave" here: the mini player is for
- * watching, and going back to the main window (button, double-click or P)
- * is the way out.
+ * Its controls (mute, volume, back to the main window) show only while
+ * the mouse is over the window, and stay out of the picture otherwise.
+ * There's deliberately no "leave" here: the mini player is for watching,
+ * and going back to the main window (button, double-click or P) is the
+ * way out.
  *
- * Hover comes from the shell when it can track it (Electron polls the
- * cursor: Windows sends the page no mouse events over the drag grip),
- * else from the page's own pointer events.
+ * Everything but the controls drags the window. Windows sends the page no
+ * mouse events over a drag area, so hover comes from the shell when it can
+ * track it (Electron polls the cursor), else from the page's own pointer
+ * events, and the shell handles the double-click.
  */
 export function FloatingPlayer({ container, stream, audio, onReturn }: FloatingPlayerProps) {
   const { t } = useI18n();
@@ -99,9 +100,7 @@ export function FloatingPlayer({ container, stream, audio, onReturn }: FloatingP
             style={{ "--fill": `${level * 100}%` } as CSSProperties}
           />
         )}
-        <span className={styles.grip} title={t.viewing.dragMiniPlayer} aria-hidden>
-          <GripIcon />
-        </span>
+        <span className={styles.spacer} />
         <button
           type="button"
           className={styles.control}

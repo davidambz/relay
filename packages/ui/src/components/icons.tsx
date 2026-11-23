@@ -138,19 +138,6 @@ export function CloseIcon(props: IconProps) {
   );
 }
 
-export function GripIcon(props: IconProps) {
-  return (
-    <svg {...base(props)} strokeWidth={0} fill="currentColor">
-      <circle cx="8" cy="9" r="1.5" />
-      <circle cx="12" cy="9" r="1.5" />
-      <circle cx="16" cy="9" r="1.5" />
-      <circle cx="8" cy="15" r="1.5" />
-      <circle cx="12" cy="15" r="1.5" />
-      <circle cx="16" cy="15" r="1.5" />
-    </svg>
-  );
-}
-
 /** A big screen over a row of small ones: the strip of other broadcasts. */
 export function StripIcon(props: IconProps) {
   return (

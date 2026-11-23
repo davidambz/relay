@@ -233,6 +233,7 @@ function createWindow() {
     child.setMenu(null);
     // The mini player replaces the main window until it closes.
     window.hide();
+    returnOnDoubleClick(child);
     const stopManaging = manageFloating(child, window);
     child.on("closed", () => {
       if (floatingWindow === child) floatingWindow = null;
@@ -276,7 +277,7 @@ const HOVER_POLL_MS = 100;
  *   reach the game, which keeps its focus) and shows no controls. Leaving
  *   the game (Alt+Tab, the desktop) makes it interactive again.
  * - Hover is polled from here because Windows delivers no mouse events to
- *   the page over the drag grip (it's the frameless window's title bar).
+ *   the page over the drag area (the whole picture).
  *   The mini player's React tree lives in the main window's renderer
  *   (window.open portal), so that's who hears it.
  */
@@ -332,6 +333,22 @@ function manageFloating(child: BrowserWindow, owner: BrowserWindow): () => void 
     clearInterval(hoverTimer);
     stopWatching?.();
   };
+}
+
+const WM_NCLBUTTONDBLCLK = 0x00a3;
+const HTCAPTION = 2;
+
+/**
+ * Double-clicking the mini player goes back to the main window. The whole
+ * picture is a drag area, so on Windows that arrives as a double-click on
+ * the title bar rather than as a page event. Closing it is how the page
+ * learns to take the video back.
+ */
+function returnOnDoubleClick(child: BrowserWindow) {
+  if (process.platform !== "win32") return;
+  child.hookWindowMessage(WM_NCLBUTTONDBLCLK, (wParam) => {
+    if (wParam.readUInt32LE(0) === HTCAPTION && !child.isDestroyed()) child.close();
+  });
 }
 
 /** Whether the window is on the monitor given in physical pixels. */

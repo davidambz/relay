@@ -153,6 +153,5 @@ export interface Strings {
     exitFullscreen: string;
     miniPlayer: string;
     returnToMain: string;
-    dragMiniPlayer: string;
   };
 }
