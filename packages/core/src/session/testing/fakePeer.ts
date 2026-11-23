@@ -192,12 +192,21 @@ export class FakePeer extends FakeEmitter implements PeerLike {
     });
     return local;
   }
-  /** Like PeerJS: a successful reconnect emits "open" again. */
+  /** Like PeerJS: a successful reconnect emits "open" again; an offline server fails it again. */
   reconnect() {
     this.disconnected = false;
     tick(() => {
-      if (!this.destroyed) this.emit("open", this.id);
+      if (this.destroyed) return;
+      if (this.network.offline) this.loseSignaling();
+      else this.emit("open", this.id);
     });
+  }
+
+  /** Like PeerJS losing its websocket: a "network" error, then "disconnected". */
+  loseSignaling() {
+    this.emit("error", { type: "network", message: "Lost connection to server." });
+    this.disconnected = true;
+    this.emit("disconnected");
   }
   destroy() {
     if (this.destroyed) return;

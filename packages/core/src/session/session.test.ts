@@ -4,8 +4,17 @@
 import { DEFAULT_SESSION_CONFIG, type SessionConfig } from "./config";
 import { HostSession, HostSessionError, VIEWER_DISCONNECT_GRACE_MS } from "./host";
 import { enableOpusStereo } from "./sdp";
-import { FakeNetwork, FakeStream, type FakeMediaConnection } from "./testing/fakePeer";
-import { VIEWER_STREAM_TIMEOUT_MS, ViewerSession, type ViewerEndReason } from "./viewer";
+import { FakeNetwork, FakeStream, type FakeMediaConnection, type FakePeer } from "./testing/fakePeer";
+import {
+  HOST_GONE_MS,
+  MEDIA_GRACE_MS,
+  RECONNECT_ATTEMPT_MS,
+  RECONNECT_DEADLINE_MS,
+  signalingBackoffMs,
+  VIEWER_STREAM_TIMEOUT_MS,
+  ViewerSession,
+  type ViewerEndReason,
+} from "./viewer";
 
 const stream = { id: "host-stream" } as unknown as MediaStream;
 // A few macrotask turns: enough for connections to open and the fake
@@ -18,6 +27,15 @@ const config = (overrides: Partial<SessionConfig> = {}): SessionConfig => ({ ...
 function codes(...values: string[]) {
   let index = 0;
   return () => values[index++] ?? "ZZZZZZ";
+}
+
+/** A viewer app that answers and then never does anything again (e.g. it froze or was killed). */
+async function bareViewer(network: FakeNetwork, code: string) {
+  const peer = network.factory(undefined, { iceServers: [] }) as FakePeer;
+  await flush();
+  peer.on("call", (call: FakeMediaConnection) => call.answer());
+  peer.connect(`relay-tenno-v1-${code}`);
+  return peer;
 }
 
 function watch(network: FakeNetwork, code: string) {
@@ -177,9 +195,8 @@ describe("host and viewer together", () => {
     const viewerLists: string[][] = [];
     const host = new HostSession(stream, config(), network.factory, { onViewersChange: (ids) => viewerLists.push(ids), makeCode: codes("ABC234") });
     await host.start();
-    watch(network, "ABC234");
+    const viewerPeer = await bareViewer(network, "ABC234");
     await flush();
-    const viewerPeer = network.created.find((peer) => peer.id.startsWith("auto-"))!;
     const firstConn = viewerPeer.connections[0];
     viewerPeer.connect("relay-tenno-v1-ABC234");
     await flush();
@@ -242,7 +259,7 @@ describe("host and viewer together", () => {
       const starting = host.start();
       await vi.advanceTimersByTimeAsync(0);
       await starting;
-      for (let i = 0; i < 3; i++) watch(network, "ABC234");
+      for (let i = 0; i < 3; i++) void bareViewer(network, "ABC234");
       await vi.advanceTimersByTimeAsync(500); // joined, health watch attached
       const [closedApp, hiccup, failed] = network.peers.get("relay-tenno-v1-ABC234")!.calls;
       expect(viewerLists.at(-1)).toHaveLength(3);
@@ -347,5 +364,146 @@ describe("session log", () => {
         expect.stringMatching(/^host:Stopped/),
       ]),
     );
+  });
+});
+
+describe("ViewerSession reconnecting", () => {
+  async function playing(network: FakeNetwork) {
+    const host = new HostSession(stream, config(), network.factory, { makeCode: codes("ABC234") });
+    const starting = host.start();
+    await vi.advanceTimersByTimeAsync(0);
+    await starting;
+    const streams: MediaStream[] = [];
+    let reconnecting = 0;
+    const result: { ended?: ViewerEndReason } = {};
+    const session = new ViewerSession("ABC234", config(), network.factory, {
+      onStream: (s) => streams.push(s),
+      onReconnecting: () => reconnecting++,
+      onEnd: (reason) => (result.ended = reason),
+    });
+    session.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    const viewerPeer = network.created.find((peer) => peer.id.startsWith("auto-"))!;
+    return { host, session, streams, result, viewerPeer, reconnects: () => reconnecting };
+  }
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("keeps playing through a signaling outage and reconnects with growing waits", async () => {
+    const network = new FakeNetwork();
+    const { streams, result, viewerPeer, reconnects } = await playing(network);
+    expect(streams).toHaveLength(1);
+    network.offline = true;
+    const reconnect = vi.spyOn(viewerPeer, "reconnect");
+    viewerPeer.loseSignaling();
+    await vi.advanceTimersByTimeAsync(1000 + 2000 + 4000);
+    expect(reconnect).toHaveBeenCalledTimes(3);
+    network.offline = false;
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(reconnect).toHaveBeenCalledTimes(4);
+    expect(viewerPeer.disconnected).toBe(false);
+    expect(result.ended).toBeUndefined();
+    expect(reconnects()).toBe(0);
+    expect(streams).toHaveLength(1);
+  });
+
+  it("gets the picture back by itself when the media drops", async () => {
+    const network = new FakeNetwork();
+    const { streams, result, viewerPeer, reconnects } = await playing(network);
+    const viewerCall = viewerPeer.connections.find((connection) => "answered" in connection) as FakeMediaConnection;
+    viewerCall.close();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reconnects()).toBe(1);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(streams).toHaveLength(2);
+    expect(result.ended).toBeUndefined();
+  });
+
+  it("treats a long media 'disconnected' as a drop, and a short one as a blip", async () => {
+    const network = new FakeNetwork();
+    const { reconnects, viewerPeer } = await playing(network);
+    const viewerCall = () => viewerPeer.connections.filter((connection) => "answered" in connection).at(-1) as FakeMediaConnection;
+    viewerCall().setConnectionState("disconnected");
+    await vi.advanceTimersByTimeAsync(MEDIA_GRACE_MS - 1000);
+    viewerCall().setConnectionState("connected");
+    await vi.advanceTimersByTimeAsync(MEDIA_GRACE_MS);
+    expect(reconnects()).toBe(0);
+    viewerCall().setConnectionState("disconnected");
+    await vi.advanceTimersByTimeAsync(MEDIA_GRACE_MS);
+    expect(reconnects()).toBe(1);
+  });
+
+  it("ends right away when the broadcaster says goodbye", async () => {
+    const network = new FakeNetwork();
+    const { host, result, reconnects } = await playing(network);
+    host.stop();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(result.ended).toBe("ended");
+    expect(reconnects()).toBe(0);
+  });
+
+  it("gives up once the broadcaster stays gone from the server", async () => {
+    const network = new FakeNetwork();
+    const { result, reconnects } = await playing(network);
+    // Relay closed without a goodbye (killed, crashed, PC off).
+    network.peers.get("relay-tenno-v1-ABC234")!.destroy();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reconnects()).toBe(1);
+    await vi.advanceTimersByTimeAsync(RECONNECT_ATTEMPT_MS);
+    expect(result.ended).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(HOST_GONE_MS);
+    expect(result.ended).toBe("ended");
+  });
+
+  it("gives up after the deadline when nothing comes back", async () => {
+    const network = new FakeNetwork();
+    const { result, viewerPeer } = await playing(network);
+    network.offline = true;
+    viewerPeer.loseSignaling();
+    const viewerCall = viewerPeer.connections.find((connection) => "answered" in connection) as FakeMediaConnection;
+    viewerCall.close();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DEADLINE_MS - RECONNECT_ATTEMPT_MS);
+    expect(result.ended).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(RECONNECT_ATTEMPT_MS * 2);
+    expect(result.ended).toBe("lost");
+  });
+
+  it("uses growing waits capped at 30 s", () => {
+    expect([0, 1, 2, 3, 4, 5, 6].map(signalingBackoffMs)).toEqual([1000, 2000, 4000, 8000, 16000, 30000, 30000]);
+  });
+});
+
+describe("HostSession signaling", () => {
+  it("keeps viewers through an outage and reconnects with growing waits", async () => {
+    vi.useFakeTimers();
+    try {
+      const network = new FakeNetwork();
+      const signaling: boolean[] = [];
+      const viewerLists: string[][] = [];
+      const host = new HostSession(stream, config(), network.factory, {
+        makeCode: codes("ABC234"),
+        onSignalingChange: (up) => signaling.push(up),
+        onViewersChange: (ids) => viewerLists.push(ids),
+      });
+      const starting = host.start();
+      await vi.advanceTimersByTimeAsync(0);
+      await starting;
+      const { result } = watch(network, "ABC234");
+      await vi.advanceTimersByTimeAsync(0);
+      const hostPeer = network.peers.get("relay-tenno-v1-ABC234")!;
+      const reconnect = vi.spyOn(hostPeer, "reconnect");
+      network.offline = true;
+      hostPeer.loseSignaling();
+      await vi.advanceTimersByTimeAsync(1000 + 2000);
+      expect(reconnect).toHaveBeenCalledTimes(2);
+      network.offline = false;
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(signaling.at(-1)).toBe(true);
+      expect(viewerLists.at(-1)).toHaveLength(1);
+      expect(result.ended).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
