@@ -105,6 +105,7 @@ export class FakeMediaConnection extends FakeEmitter implements MediaConnectionL
     },
     addEventListener: (_type: string, listener: () => void) => owner.stateListeners.add(listener),
     removeEventListener: (_type: string, listener: () => void) => owner.stateListeners.delete(listener),
+    getStats: async () => new Map(),
     getSenders: () => [owner.sender, ...(owner.audioSender ? [owner.audioSender] : [])],
     getTransceivers: () => [
       { sender: owner.sender, receiver: { track: { kind: "video" } } },

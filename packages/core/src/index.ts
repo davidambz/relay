@@ -3,6 +3,7 @@
 
 export * from "./code";
 export * from "./locale";
+export * from "./log";
 export type * from "./platform";
 export * from "./session";
 export * from "./updates";

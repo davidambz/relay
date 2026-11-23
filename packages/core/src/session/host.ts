@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { generateCode, peerIdForCode } from "../code";
+import { maskCode, type LogFn } from "../log";
 import { applySenderSettings, maxBitrateForViewers, type SenderSettings } from "./bitrate";
 import type { SessionConfig } from "./config";
 import type { HostMessage } from "./messages";
@@ -25,6 +26,8 @@ export interface HostSessionEvents {
   onViewersChange?: (viewerIds: string[]) => void;
   /** Lost the signaling server; existing viewers keep watching meanwhile. */
   onSignalingChange?: (connected: boolean) => void;
+  /** Diagnostics (Platform.log). */
+  log?: LogFn;
 }
 
 export interface EncoderSettings {
@@ -103,6 +106,11 @@ export class HostSession {
     this.sdpTransform = sessionSdpTransform(config.preferredVideoCodec);
   }
 
+  private log(level: "info" | "warn" | "error", message: string, data?: Record<string, string | number | boolean | undefined>) {
+    const code = this.currentCode ? maskCode(this.currentCode) : undefined;
+    this.events.log?.({ level, scope: "host", message, data: { code, ...data } });
+  }
+
   get code(): string | null {
     return this.currentCode;
   }
@@ -127,11 +135,13 @@ export class HostSession {
       }
       if (outcome === "open") {
         this.currentCode = code;
+        this.log("info", "On air", { attempts: attempt });
         this.listen(peer);
         return code;
       }
       peer.destroy();
       if (outcome.type !== "unavailable-id") {
+        this.log("error", "Couldn't start", { error: outcome.type });
         throw new HostSessionError(outcome.type, outcome.message ?? "Couldn't reach the signaling server");
       }
     }
@@ -142,6 +152,7 @@ export class HostSession {
   stop() {
     if (this.stopped) return;
     this.stopped = true;
+    this.log("info", "Stopped", { viewers: this.viewers.size });
     const peer = this.peer;
     if (peer && this.currentCode === null) {
       // Still claiming a code: nobody to say goodbye to, tear down now so
@@ -163,14 +174,19 @@ export class HostSession {
     // Viewers never call us; refuse anything that tries.
     peer.on("call", (call: MediaConnectionLike) => call.close());
     peer.on("disconnected", () => {
+      this.log("warn", "Lost the signaling server");
       this.events.onSignalingChange?.(false);
       if (!this.stopped && !peer.destroyed) peer.reconnect();
     });
-    peer.on("open", () => this.events.onSignalingChange?.(true));
+    peer.on("open", () => {
+      this.log("info", "Signaling server back");
+      this.events.onSignalingChange?.(true);
+    });
     peer.on("error", (error: PeerError) => {
       // After startup, errors are about one connection or the signaling
       // link; viewers already connected keep their media either way.
       console.warn("Relay host peer error", error.type, error.message);
+      this.log("warn", "Peer error", { error: error.type });
     });
   }
 
@@ -185,7 +201,7 @@ export class HostSession {
       // build) replaces its previous entry; otherwise the old call would
       // keep encoding and uploading without being counted or closed.
       const previous = this.viewers.get(conn.peer);
-      if (previous) this.removeViewer(previous, false);
+      if (previous) this.removeViewer(previous, false, "replaced");
       const { maxViewers } = this.config;
       if (maxViewers !== undefined && this.viewers.size >= maxViewers) {
         const full: HostMessage = { type: "full", maxViewers };
@@ -199,8 +215,9 @@ export class HostSession {
       viewer = current;
       this.viewers.set(conn.peer, current);
       call.on("close", () => this.removeViewer(current));
-      call.on("error", () => this.removeViewer(current));
+      call.on("error", () => this.removeViewer(current, true, "call-error"));
       this.watchHealth(current);
+      this.log("info", "Viewer joined", { viewers: this.viewers.size });
       this.viewersChanged();
     });
     conn.on("close", () => viewer && this.removeViewer(viewer));
@@ -211,11 +228,13 @@ export class HostSession {
    * Tears one viewer entry down. Keyed by the entry, not the peer id, so
    * late events from a replaced connection can't remove its successor.
    */
-  private removeViewer(viewer: Viewer, notify = true) {
+  private removeViewer(viewer: Viewer, notify = true, reason = "closed") {
     if (viewer.closed) return;
     viewer.closed = true;
     viewer.unwatch?.();
     if (this.viewers.get(viewer.id) === viewer) this.viewers.delete(viewer.id);
+    const expected = reason === "closed" || reason === "replaced";
+    this.log(expected ? "info" : "warn", "Viewer left", { reason, viewers: this.viewers.size });
     viewer.call.close();
     viewer.conn.close();
     if (notify) this.viewersChanged();
@@ -279,9 +298,9 @@ export class HostSession {
     const onStateChange = () => {
       const state = pc?.connectionState;
       if (state === "failed" || state === "closed") {
-        this.removeViewer(viewer);
+        this.removeViewer(viewer, true, `media-${state}`);
       } else if (state === "disconnected") {
-        if (!graceTimer) graceTimer = setTimeout(() => this.removeViewer(viewer), VIEWER_DISCONNECT_GRACE_MS);
+        if (!graceTimer) graceTimer = setTimeout(() => this.removeViewer(viewer, true, "media-disconnected"), VIEWER_DISCONNECT_GRACE_MS);
       } else {
         clearGrace();
       }

@@ -8,6 +8,7 @@ import { Dialog } from "./components/Dialog";
 import { Header } from "./components/Header";
 import { BroadcastSettingsDialog } from "./dialogs/BroadcastSettingsDialog";
 import { GoLiveDialog } from "./dialogs/GoLiveDialog";
+import { SettingsDialog } from "./dialogs/SettingsDialog";
 import { WatchDialog } from "./dialogs/WatchDialog";
 import { useI18n } from "./i18n/I18nContext";
 import { usePlatform } from "./platform/PlatformContext";
@@ -55,6 +56,8 @@ type OpenDialog =
   | { kind: "go-live" }
   | { kind: "switch-source" }
   | { kind: "settings" }
+  /** The app's own settings (updates, logs), from the header. */
+  | { kind: "app-settings" }
   /** Confirming Stop: ending it disconnects everyone watching. */
   | { kind: "stop" }
   /** Confirming leaving a watched broadcast. */
@@ -176,7 +179,7 @@ export function App() {
   return (
     <div className={styles.app}>
       {viewerSessions}
-      {!(pictureInPicture && view.screen === "stage") && <Header status={view.status} />}
+      {!(pictureInPicture && view.screen === "stage") && <Header status={view.status} onSettings={() => openDialog({ kind: "app-settings" })} />}
       <main className={styles.main} data-screen={view.screen}>
         {view.screen === "home" ? (
           <Home
@@ -238,6 +241,7 @@ export function App() {
           onAudioChange={broadcastActions.setAudioOn}
         />
       )}
+      {dialog?.kind === "app-settings" && <SettingsDialog onClose={closeDialog} />}
       {dialog?.kind === "watch" && (
         <WatchDialog
           ownCode={ownCode}

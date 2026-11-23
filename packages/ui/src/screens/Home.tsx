@@ -5,7 +5,7 @@ import { Button } from "../components/Button";
 import { BroadcastIcon, WatchIcon } from "../components/icons";
 import { useI18n } from "../i18n/I18nContext";
 import { usePlatform } from "../platform/PlatformContext";
-import { UpdatesPanel } from "../components/UpdatesPanel";
+import { UpdateNotice } from "../components/UpdateNotice";
 import screen from "./Screen.module.css";
 import styles from "./Home.module.css";
 
@@ -28,6 +28,7 @@ export function Home({ onBroadcast, onWatch, notice }: HomeProps) {
           {notice}
         </p>
       )}
+      <UpdateNotice />
       <div className={styles.bays}>
         {platform.capabilities.host && (
           <section className={[screen.panel, styles.bay].join(" ")} aria-labelledby="home-broadcast">
@@ -56,7 +57,6 @@ export function Home({ onBroadcast, onWatch, notice }: HomeProps) {
           </Button>
         </section>
       </div>
-      <UpdatesPanel />
     </div>
   );
 }

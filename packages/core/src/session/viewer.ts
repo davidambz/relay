@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { peerIdForCode } from "../code";
+import { maskCode, type LogFn } from "../log";
 import type { SessionConfig } from "./config";
 import { isHostMessage } from "./messages";
 import type { DataConnectionLike, MediaConnectionLike, PeerError, PeerFactory, PeerLike } from "./peer";
 import { sessionSdpTransform } from "./sdp";
+import { sampleConnection, sampleFields, type ConnectionSample } from "./stats";
 
 /** No stream this long after connecting usually means NAT/firewall trouble. */
 export const VIEWER_STREAM_TIMEOUT_MS = 20_000;
+/** How often a playing connection's health is sampled for the log. */
+export const VIEWER_SAMPLE_MS = 5000;
 
 export type ViewerEndReason =
   | "ended" // the broadcaster stopped or went away
@@ -21,6 +25,8 @@ export type ViewerEndReason =
 export interface ViewerSessionEvents {
   onStream?: (stream: MediaStream) => void;
   onEnd?: (reason: ViewerEndReason) => void;
+  /** Diagnostics (Platform.log). */
+  log?: LogFn;
 }
 
 /**
@@ -32,6 +38,8 @@ export class ViewerSession {
   private conn: DataConnectionLike | null = null;
   private ended = false;
   private timeout: ReturnType<typeof setTimeout> | null = null;
+  private sampler: ReturnType<typeof setInterval> | null = null;
+  private lastSample: ConnectionSample | undefined;
   private readonly code: string;
   private readonly config: SessionConfig;
   private readonly createPeer: PeerFactory;
@@ -44,10 +52,15 @@ export class ViewerSession {
     this.events = events;
   }
 
+  private log(level: "info" | "warn" | "error", message: string, data?: Record<string, string | number | boolean | undefined>) {
+    this.events.log?.({ level, scope: "viewer", message, data: { code: maskCode(this.code), ...data } });
+  }
+
   connect() {
     const hostId = peerIdForCode(this.code);
     const peer = this.createPeer(undefined, { iceServers: this.config.iceServers, server: this.config.server });
     this.peer = peer;
+    this.log("info", "Connecting");
     this.timeout = setTimeout(() => this.end("timeout"), VIEWER_STREAM_TIMEOUT_MS);
 
     // PeerJS emits "open" again after every successful reconnect(); the
@@ -67,6 +80,7 @@ export class ViewerSession {
       } else console.warn("Relay viewer peer error", error.type, error.message);
     });
     peer.on("disconnected", () => {
+      if (!this.ended) this.log("warn", "Lost the signaling server");
       // Losing signaling doesn't drop media that's already flowing.
       if (!this.ended && !peer.destroyed) peer.reconnect();
     });
@@ -94,14 +108,44 @@ export class ViewerSession {
       if (this.ended) return;
       if (this.timeout) clearTimeout(this.timeout);
       this.timeout = null;
+      this.log("info", "Playing");
+      this.watchHealth(call);
       this.events.onStream?.(stream);
     });
     call.on("close", () => this.end("ended"));
   }
 
+  /** Samples the connection now and then, so a drop is logged with what it looked like. */
+  private watchHealth(call: MediaConnectionLike) {
+    const pc = call.peerConnection;
+    if (!pc || this.sampler) return;
+    const sample = () => {
+      void pc.getStats().then(
+        (report) => {
+          const next = sampleConnection(report, Date.now(), this.lastSample);
+          // A dead connection reports no route: keep the last one known.
+          next.route ??= this.lastSample?.route;
+          this.lastSample = next;
+        },
+        () => {},
+      );
+    };
+    sample();
+    this.sampler = setInterval(sample, VIEWER_SAMPLE_MS);
+    pc.addEventListener("connectionstatechange", () => {
+      const state = pc.connectionState;
+      if (state === "connected") this.log("info", "Media connected", { route: this.lastSample?.route });
+      else if (state === "disconnected" || state === "failed") {
+        this.log("warn", "Media connection changed", { state, ...sampleFields(this.lastSample) });
+      }
+    });
+  }
+
   private end(reason: ViewerEndReason) {
     if (this.ended) return;
     this.ended = true;
+    this.log(reason === "left" ? "info" : "warn", "Ended", { reason, ...sampleFields(this.lastSample) });
+    if (this.sampler) clearInterval(this.sampler);
     if (this.timeout) clearTimeout(this.timeout);
     this.peer?.destroy();
     this.events.onEnd?.(reason);

@@ -324,3 +324,28 @@ describe("ViewerSession", () => {
     expect(result.ended).toBe("network");
   });
 });
+
+describe("session log", () => {
+  it("logs the broadcast and the viewer without full codes", async () => {
+    const network = new FakeNetwork();
+    const entries: string[] = [];
+    const log = (entry: { scope: string; message: string; data?: Record<string, unknown> }) =>
+      entries.push(`${entry.scope}:${entry.message}:${JSON.stringify(entry.data)}`);
+    const host = new HostSession(stream, config(), network.factory, { makeCode: codes("ABC234"), log });
+    await host.start();
+    const viewer = new ViewerSession("ABC234", config(), network.factory, { log });
+    viewer.connect();
+    await vi.waitFor(() => expect(entries.some((line) => line.startsWith("viewer:Playing"))).toBe(true));
+    viewer.leave();
+    host.stop();
+    expect(entries.join("\n")).not.toContain("ABC234");
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^host:On air:.*"ABC•••"/),
+        expect.stringMatching(/^host:Viewer joined:.*"viewers":1/),
+        expect.stringMatching(/^viewer:Ended:.*"reason":"left"/),
+        expect.stringMatching(/^host:Stopped/),
+      ]),
+    );
+  });
+});

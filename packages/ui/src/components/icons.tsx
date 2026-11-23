@@ -183,6 +183,16 @@ export function SlidersIcon(props: IconProps) {
   );
 }
 
+/** A gear: the app's settings. */
+export function GearIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M19.4 10.4 L21.7 9.6 L21.7 14.4 L19.4 13.6 L18.4 16.2 L20.5 17.2 L17.2 20.5 L16.2 18.4 L13.6 19.4 L14.4 21.7 L9.6 21.7 L10.4 19.4 L7.8 18.4 L6.8 20.5 L3.5 17.2 L5.6 16.2 L4.6 13.6 L2.3 14.4 L2.3 9.6 L4.6 10.4 L5.6 7.8 L3.5 6.8 L6.8 3.5 L7.8 5.6 L10.4 4.6 L9.6 2.3 L14.4 2.3 L13.6 4.6 L16.2 5.6 L17.2 3.5 L20.5 6.8 L18.4 7.8Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 /** A screen with a plus: watch one more broadcast. */
 export function AddWatchIcon(props: IconProps) {
   return (

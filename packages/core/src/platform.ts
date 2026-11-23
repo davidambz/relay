@@ -7,6 +7,8 @@
 // `capabilities` — never by sniffing for Electron — so a new shell is "write
 // one adapter", not "fork the UI".
 
+import type { LogFn } from "./log";
+
 export type Theme = "dark" | "light";
 
 export type CaptureSourceKind = "screen" | "window";
@@ -130,4 +132,9 @@ export interface Platform {
    * unsubscribe function.
    */
   onFloatingHover?(listener: (hovered: boolean) => void): () => void;
+
+  /** Appends to the shell's diagnostics log, where it keeps one. */
+  log?: LogFn;
+  /** Shows the folder holding the log files (Settings). */
+  openLogFolder?(): Promise<void>;
 }
